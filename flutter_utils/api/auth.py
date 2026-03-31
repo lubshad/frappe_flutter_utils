@@ -55,6 +55,7 @@ def send_login_otp(email: str) -> dict:
 		recipients=[email],
 		subject=_("Your Login OTP – {0}").format(app_name),
 		message=otp_email_body(otp, "login", app_name),
+		now=True,
 	)
 	return {"message": _("OTP sent successfully.")}
 
@@ -109,6 +110,7 @@ def send_signup_otp(full_name: str, email: str) -> dict:
 		recipients=[email],
 		subject=_("Verify your email – {0}").format(app_name),
 		message=otp_email_body(otp, "signup", app_name),
+		now=True,
 	)
 	return {"message": _("OTP sent successfully.")}
 
