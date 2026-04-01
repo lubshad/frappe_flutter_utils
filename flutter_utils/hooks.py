@@ -31,7 +31,7 @@ before_request = ["flutter_utils.utils.patch_exception_handler"]
 # ------------
 
 # before_install = "flutter_utils.install.before_install"
-# after_install = "flutter_utils.install.after_install"
+after_install = "flutter_utils.install.after_install"
 
 # Uninstallation
 # ------------

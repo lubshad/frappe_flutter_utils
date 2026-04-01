@@ -1,0 +1,1 @@
+flutter_utils.patches.v1_0.create_otp_email_template

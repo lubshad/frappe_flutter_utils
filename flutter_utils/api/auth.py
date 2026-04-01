@@ -49,14 +49,7 @@ def send_login_otp(email: str) -> dict:
 	otp = str(random.randint(100000, 999999))
 	otp_set(f"login_otp:{email}", otp)
 
-	app_name = frappe.local.site
-
-	frappe.sendmail(
-		recipients=[email],
-		subject=_("Your Login OTP – {0}").format(app_name),
-		message=otp_email_body(otp, "login", app_name),
-		now=True,
-	)
+	send_otp_email(email, otp, "login")
 	return {"message": _("OTP sent successfully.")}
 
 
@@ -104,14 +97,7 @@ def send_signup_otp(full_name: str, email: str) -> dict:
 	otp = str(random.randint(100000, 999999))
 	otp_set(f"signup_otp:{email}", json.dumps({"full_name": full_name.strip(), "otp": otp}))
 
-	app_name = frappe.local.site
-
-	frappe.sendmail(
-		recipients=[email],
-		subject=_("Verify your email – {0}").format(app_name),
-		message=otp_email_body(otp, "signup", app_name),
-		now=True,
-	)
+	send_otp_email(email, otp, "signup")
 	return {"message": _("OTP sent successfully.")}
 
 
@@ -164,6 +150,41 @@ def otp_get(name: str) -> str | None:
 
 def otp_delete(name: str) -> None:
 	frappe.cache().delete(_otp_cache_key(name))
+
+
+def send_otp_email(email: str, otp: str, context: str) -> None:
+	"""
+	Sends an OTP email using the 'OTP Email Template' if it exists,
+	otherwise falls back to a hardcoded format.
+	"""
+	app_name = frappe.get_system_settings("app_name") or frappe.local.site
+	action = _("complete your signup") if context == "signup" else _("sign in")
+
+	template_name = _("OTP Email Template")
+	if frappe.db.exists("Email Template", template_name):
+		email_template = frappe.get_doc("Email Template", template_name)
+		formatted = email_template.get_formatted_email({
+			"otp": otp,
+			"action": action,
+			"app_name": app_name
+		})
+		subject = formatted["subject"]
+		message = formatted["message"]
+	else:
+		# Fallback to hardcoded style
+		subject = (
+			_("Verify your email – {0}").format(app_name)
+			if context == "signup"
+			else _("Your Login OTP – {0}").format(app_name)
+		)
+		message = otp_email_body(otp, context, app_name)
+
+	frappe.sendmail(
+		recipients=[email],
+		subject=subject,
+		message=message,
+		now=True,
+	)
 
 
 def otp_email_body(otp: str, context: str, app_name: str) -> str:
