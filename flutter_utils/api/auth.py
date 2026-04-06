@@ -105,6 +105,7 @@ def send_signup_otp(full_name: str, email: str) -> dict:
 def verify_signup_otp(email: str, otp: str) -> dict:
 	"""
 	Verifies the OTP for a signup request and creates a new enabled User account.
+	On success, returns api_key and api_secret for authenticated requests.
 	"""
 	email = email.strip().lower()
 	raw = otp_get(f"signup_otp:{email}")
@@ -121,10 +122,21 @@ def verify_signup_otp(email: str, otp: str) -> dict:
 	user.enabled = 1
 	user.new_password = frappe.generate_hash(length=20)
 	user.send_welcome_email = 0
+
+	# Generate API credentials
+	api_secret = frappe.generate_hash(length=15)
+	user.api_key = frappe.generate_hash(length=15)
+	user.api_secret = api_secret
+
 	user.insert(ignore_permissions=True)
 	frappe.db.commit()
 
-	return {"message": _("Account created successfully.")}
+	return {
+		"api_key": user.api_key,
+		"api_secret": api_secret,
+		"full_name": user.full_name,
+		"email": user.email,
+	}
 
 
 # ---------------------------------------------------------------------------
