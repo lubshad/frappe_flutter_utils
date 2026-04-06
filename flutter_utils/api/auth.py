@@ -169,7 +169,11 @@ def send_otp_email(email: str, otp: str, context: str) -> None:
 	Sends an OTP email using the 'OTP Email Template' if it exists,
 	otherwise falls back to a hardcoded format.
 	"""
-	app_name = frappe.get_system_settings("app_name") or frappe.local.site
+	app_name = (
+		frappe.db.get_single_value("Website Settings", "app_name")
+		or frappe.get_system_settings("app_name")
+		or frappe.local.site
+	)
 	action = _("complete your signup") if context == "signup" else _("sign in")
 
 	template_name = _("OTP Email Template")
