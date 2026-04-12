@@ -1,0 +1,205 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-11 13:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "otp_settings_section",
+  "enable_email_otp",
+  "enable_mobile_otp",
+  "column_break_qpmo",
+  "otp_ttl_seconds",
+  "otp_default_region",
+  "test_mode",
+  "email_section",
+  "email_otp_subject_template",
+  "email_otp_body_template",
+  "twilio_section",
+  "sms_gateway",
+  "twilio_account_sid",
+  "column_break_gxji",
+  "twilio_auth_token",
+  "twilio_from_number",
+  "ultramsg_base_url",
+  "ultramsg_instance_id",
+  "ultramsg_token",
+  "sms_content_section",
+  "sms_otp_body_template",
+  "test_section",
+  "send_test_message"
+ ],
+ "fields": [
+  {
+   "fieldname": "otp_settings_section",
+   "fieldtype": "Section Break",
+   "label": "OTP Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_email_otp",
+   "fieldtype": "Check",
+   "label": "Enable Email OTP"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_mobile_otp",
+   "fieldtype": "Check",
+   "label": "Enable Mobile OTP"
+  },
+  {
+   "fieldname": "column_break_qpmo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "600",
+   "description": "OTP expiry time in seconds.",
+   "fieldname": "otp_ttl_seconds",
+   "fieldtype": "Int",
+   "label": "OTP TTL (Seconds)",
+   "reqd": 1
+  },
+  {
+   "description": "Used when the client sends a phone number without country code.",
+   "fieldname": "otp_default_region",
+   "fieldtype": "Link",
+   "label": "Default Region",
+   "options": "Country"
+  },
+  {
+   "default": "0",
+   "description": "Skip SMS delivery and return OTP values directly from send APIs.",
+   "fieldname": "test_mode",
+   "fieldtype": "Check",
+   "label": "Test Mode"
+  },
+  {
+   "depends_on": "eval:doc.enable_email_otp",
+   "fieldname": "email_section",
+   "fieldtype": "Section Break",
+   "label": "Email Content"
+  },
+  {
+   "depends_on": "eval:doc.enable_email_otp",
+   "fieldname": "email_otp_subject_template",
+   "fieldtype": "Data",
+   "label": "Email Subject Template"
+  },
+  {
+   "depends_on": "eval:doc.enable_email_otp",
+   "description": "Available placeholders: {{ app_name }}, {{ otp }}, {{ action }}, {{ expiry_minutes }}.",
+   "fieldname": "email_otp_body_template",
+   "fieldtype": "Text Editor",
+   "label": "Email Body Template"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp",
+   "fieldname": "twilio_section",
+   "fieldtype": "Section Break",
+   "label": "SMS Gateway"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp",
+   "fieldname": "sms_gateway",
+   "fieldtype": "Select",
+   "label": "SMS Gateway",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp",
+   "options": "\nTwilio\nUltraMsg"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'",
+   "fieldname": "twilio_account_sid",
+   "fieldtype": "Data",
+   "label": "Twilio Account SID",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'"
+  },
+  {
+   "fieldname": "column_break_gxji",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'",
+   "fieldname": "twilio_auth_token",
+   "fieldtype": "Password",
+   "label": "Twilio Auth Token",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'",
+   "fieldname": "twilio_from_number",
+   "fieldtype": "Data",
+   "label": "Twilio From Number",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'Twilio'"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'UltraMsg'",
+   "description": "Defaults to https://api.ultramsg.com when left empty.",
+   "fieldname": "ultramsg_base_url",
+   "fieldtype": "Data",
+   "label": "UltraMsg Base URL"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'UltraMsg'",
+   "fieldname": "ultramsg_instance_id",
+   "fieldtype": "Data",
+   "label": "UltraMsg Instance ID",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'UltraMsg'"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'UltraMsg'",
+   "fieldname": "ultramsg_token",
+   "fieldtype": "Password",
+   "label": "UltraMsg Token",
+   "mandatory_depends_on": "eval:doc.enable_mobile_otp && doc.sms_gateway === 'UltraMsg'"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp",
+   "fieldname": "sms_content_section",
+   "fieldtype": "Section Break",
+   "label": "SMS Content"
+  },
+  {
+   "depends_on": "eval:doc.enable_mobile_otp",
+   "description": "Available placeholders: {{ app_name }}, {{ otp }}, {{ action }}, {{ expiry_minutes }}, {{ full_name }}.",
+   "fieldname": "sms_otp_body_template",
+   "fieldtype": "Small Text",
+   "label": "SMS Body Template"
+  },
+  {
+   "fieldname": "test_section",
+   "fieldtype": "Section Break",
+   "label": "Integration Test"
+  },
+  {
+   "fieldname": "send_test_message",
+   "fieldtype": "Button",
+   "label": "Send Test Message"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-11 13:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flutter Utils",
+ "name": "Flutter Utils Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
