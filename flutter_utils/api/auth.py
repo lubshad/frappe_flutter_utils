@@ -5,6 +5,8 @@ import frappe
 import phonenumbers
 import requests
 from frappe import _
+from frappe.email.doctype.email_account.email_account import EmailAccount
+from frappe.utils.password import set_encrypted_password
 
 OTP_PURPOSES = {"login", "signup"}
 OTP_CHANNELS = {"email", "mobile"}
@@ -52,8 +54,9 @@ def send_otp(
 		payload["otp"] = otp
 		recipient_name = payload["full_name"]
 
+	cache_key = build_otp_cache_key(purpose, context["channel"], context["recipient"])
 	otp_set(
-		build_otp_cache_key(purpose, context["channel"], context["recipient"]),
+		cache_key,
 		json.dumps(payload),
 		ttl=get_otp_ttl_seconds(),
 	)
@@ -61,13 +64,18 @@ def send_otp(
 	if settings.test_mode:
 		return build_otp_send_response(otp)
 
-	deliver_otp(
-		channel=context["channel"],
-		recipient=context["recipient"],
-		otp=otp,
-		context=purpose,
-		full_name=recipient_name,
-	)
+	try:
+		deliver_otp(
+			channel=context["channel"],
+			recipient=context["recipient"],
+			otp=otp,
+			context=purpose,
+			full_name=recipient_name,
+		)
+	except Exception:
+		otp_delete(cache_key)
+		raise
+
 	return build_otp_send_response()
 
 
@@ -312,8 +320,9 @@ def issue_user_api_credentials(user) -> dict:
 	api_secret = frappe.generate_hash(length=15)
 	if not user.api_key:
 		user.api_key = frappe.generate_hash(length=15)
+		user.db_set("api_key", user.api_key, update_modified=False)
+	set_encrypted_password("User", user.name, api_secret, "api_secret")
 	user.api_secret = api_secret
-	user.save(ignore_permissions=True)
 	frappe.db.commit()
 	return build_auth_response(user, api_secret=api_secret)
 
@@ -362,8 +371,21 @@ def send_otp_email(email: str, otp: str, context: str) -> None:
 		frappe.throw(_("Email OTP is disabled in Flutter Utils Settings."))
 
 	subject, message = get_email_otp_message(otp=otp, context=context)
+	ensure_email_otp_delivery_is_configured()
 
 	frappe.sendmail(recipients=[email], subject=subject, message=message, now=True)
+
+
+def ensure_email_otp_delivery_is_configured() -> None:
+	email_account = EmailAccount.find_outgoing(_raise_error=True)
+	if email_account.service == "Sendgrid HTTP":
+		api_key = email_account.get_password("password") or frappe.conf.get("sendgrid_api_key")
+		if not api_key:
+			frappe.throw(_("SendGrid API key is not configured for the outgoing email account."))
+		return
+
+	if email_account.service != "Frappe Mail":
+		email_account.get_smtp_server()
 
 
 def send_otp_sms(mobile_no: str, otp: str, context: str, full_name: str | None = None) -> None:

@@ -12,24 +12,33 @@ def handle_exception(e):
 	response that can be easily parsed by the frontend (Flutter).
 	"""
 	http_status_code = getattr(e, "http_status_code", 500)
+	error_code = "server_error"
 
 	# Determine the message
-	if isinstance(e, frappe.ValidationError):
+	if isinstance(e, frappe.OutgoingEmailError):
+		message = _("OTP email delivery is not configured. Please contact support.")
+		error_code = "outgoing_email_not_configured"
+	elif isinstance(e, frappe.ValidationError):
 		# Clean up ValidationError messages
 		parts = str(e).split("ValidationError:")
 		message = parts[-1].lstrip(": ").strip() if len(parts) > 1 else str(e)
+		error_code = "validation_error"
 	elif isinstance(e, frappe.PermissionError):
 		message = _("You do not have enough permissions to complete this action.")
 		http_status_code = 403
+		error_code = "permission_denied"
 	elif isinstance(e, frappe.DoesNotExistError):
 		message = _("The resource you are looking for was not found.")
 		http_status_code = 404
+		error_code = "not_found"
 	elif isinstance(e, frappe.AuthenticationError):
 		message = _("Authentication failed. Please check your credentials.")
 		http_status_code = 401
+		error_code = "authentication_failed"
 	elif isinstance(e, frappe.SessionStopped):
 		message = _("The session has stopped. Please login again.")
 		http_status_code = 401
+		error_code = "session_stopped"
 	else:
 		# Generic error message for other exceptions
 		if frappe.conf.developer_mode:
@@ -51,6 +60,7 @@ def handle_exception(e):
 	# Add the extra human-readable message key
 	response_data["status"] = "error"
 	response_data["message"] = message
+	response_data["error_code"] = error_code
 
 	# Re-serialize the response data with the extra key
 	response = Response(
