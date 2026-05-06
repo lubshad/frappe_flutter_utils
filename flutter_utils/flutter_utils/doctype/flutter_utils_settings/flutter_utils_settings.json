@@ -12,6 +12,8 @@
   "otp_ttl_seconds",
   "otp_default_region",
   "test_mode",
+  "banner_settings_section",
+  "default_banner_slideshow",
   "email_section",
   "email_otp_subject_template",
   "email_otp_body_template",
@@ -72,6 +74,18 @@
    "fieldname": "test_mode",
    "fieldtype": "Check",
    "label": "Test Mode"
+  },
+  {
+   "fieldname": "banner_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Banner Settings"
+  },
+  {
+   "description": "Used by flutter_utils.api.banners.get_banners when no slideshow is provided.",
+   "fieldname": "default_banner_slideshow",
+   "fieldtype": "Link",
+   "label": "Default Banner Slideshow",
+   "options": "Website Slideshow"
   },
   {
    "depends_on": "eval:doc.enable_email_otp",

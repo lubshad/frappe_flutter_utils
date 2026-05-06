@@ -19,6 +19,7 @@ class FlutterUtilsSettings(Document):
 		email_otp_subject_template: DF.Data | None
 		enable_email_otp: DF.Check
 		enable_mobile_otp: DF.Check
+		default_banner_slideshow: DF.Link | None
 		ultramsg_base_url: DF.Data | None
 		ultramsg_instance_id: DF.Data | None
 		ultramsg_token: DF.Password | None
