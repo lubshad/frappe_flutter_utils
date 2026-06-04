@@ -69,7 +69,7 @@
    "options": "Country"
   },
   {
-   "default": "0",
+   "default": "1",
    "description": "Skip SMS delivery and return OTP values directly from send APIs.",
    "fieldname": "test_mode",
    "fieldtype": "Check",
