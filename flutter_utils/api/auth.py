@@ -8,8 +8,10 @@ from frappe import _
 from frappe.email.doctype.email_account.email_account import EmailAccount
 from frappe.utils.password import set_encrypted_password
 
-OTP_PURPOSES = {"login", "signup"}
+OTP_PURPOSES = {"login", "signup", "reset_password"}
 OTP_CHANNELS = {"email", "mobile"}
+
+RESET_PASSWORD_COOLDOWN_SECONDS = 60
 
 
 @frappe.whitelist(allow_guest=True)
@@ -49,6 +51,11 @@ def send_otp(
 		user = validate_login_target(context)
 		payload = {"otp": otp}
 		recipient_name = user.full_name
+	elif purpose == "reset_password":
+		user = validate_reset_password_target(context)
+		enforce_reset_password_cooldown(context["recipient"])
+		payload = {"otp": otp}
+		recipient_name = user.full_name
 	else:
 		payload = validate_signup_target(context, full_name=full_name, email=email)
 		payload["otp"] = otp
@@ -86,9 +93,11 @@ def verify_otp(
 	channel: str | None = None,
 	email: str | None = None,
 	mobile_no: str | None = None,
+	new_password: str | None = None,
 ) -> dict:
 	"""
-	Verifies an OTP for login or signup and returns auth credentials on success.
+	Verifies an OTP for login, signup, or reset_password and returns auth credentials on success.
+	For reset_password, new_password is required and the user's password is updated.
 	"""
 	purpose = normalize_otp_purpose(purpose)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
@@ -108,6 +117,15 @@ def verify_otp(
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
 		return issue_user_api_credentials(user)
+
+	if purpose == "reset_password":
+		user = (
+			frappe.get_doc("User", context["recipient"])
+			if context["channel"] == "email"
+			else get_enabled_user_by_mobile(context["recipient"])
+		)
+		set_user_password(user, new_password)
+		return {"message": _("Password has been reset successfully.")}
 
 	assert_signup_identity_available(data.get("email"), data.get("mobile_no"))
 	user, api_secret = create_user_with_api_credentials(
@@ -164,10 +182,28 @@ def verify_mobile_signup_otp(mobile_no: str, otp: str) -> dict:
 	return verify_otp(purpose="signup", channel="mobile", mobile_no=mobile_no, otp=otp)
 
 
+@frappe.whitelist(allow_guest=True)
+def send_password_reset_otp(email: str) -> dict:
+	"""Sends a password-reset OTP to the given email address."""
+	return send_otp(purpose="reset_password", channel="email", email=email)
+
+
+@frappe.whitelist(allow_guest=True)
+def verify_password_reset_otp(email: str, otp: str, new_password: str) -> dict:
+	"""Verifies a password-reset OTP and sets a new password for the user."""
+	return verify_otp(
+		purpose="reset_password",
+		channel="email",
+		email=email,
+		otp=otp,
+		new_password=new_password,
+	)
+
+
 def normalize_otp_purpose(purpose: str) -> str:
 	normalized = purpose.strip().lower()
 	if normalized not in OTP_PURPOSES:
-		frappe.throw(_("Purpose must be one of: login, signup."))
+		frappe.throw(_("Purpose must be one of: login, signup, reset_password."))
 	return normalized
 
 
@@ -199,6 +235,37 @@ def validate_login_target(context: dict[str, str]):
 		return frappe.get_doc("User", context["recipient"])
 
 	return get_enabled_user_by_mobile(context["recipient"])
+
+
+def validate_reset_password_target(context: dict[str, str]):
+	if context["channel"] != "email":
+		frappe.throw(_("Password reset is only available via email."))
+
+	email = context["recipient"]
+	enabled = frappe.db.get_value("User", email, "enabled")
+	if not enabled:
+		frappe.throw(_("No active account found for this email."))
+	user_type = frappe.db.get_value("User", email, "user_type")
+	if user_type == "System User" and email in ("Administrator", "Guest"):
+		frappe.throw(_("Password reset is not available for this account."))
+	return frappe.get_doc("User", email)
+
+
+def enforce_reset_password_cooldown(recipient: str) -> None:
+	cooldown_key = f"reset_password_cooldown:{recipient}"
+	if otp_get(cooldown_key):
+		frappe.throw(
+			_("Please wait before requesting another password reset OTP.")
+		)
+	otp_set(cooldown_key, "1", ttl=RESET_PASSWORD_COOLDOWN_SECONDS)
+
+
+def set_user_password(user, new_password: str | None) -> None:
+	if not new_password or not new_password.strip():
+		frappe.throw(_("A new password is required."))
+	user.new_password = new_password
+	user.save(ignore_permissions=True)
+	frappe.db.commit()
 
 
 def validate_signup_target(context: dict[str, str], full_name: str | None, email: str | None) -> dict:
@@ -520,6 +587,12 @@ def get_otp_ttl_seconds() -> int:
 
 def get_otp_template_context(otp: str, context: str, full_name: str | None = None) -> dict[str, str | int]:
 	ttl_seconds = get_otp_ttl_seconds()
+	if context == "signup":
+		action = _("complete your signup")
+	elif context == "reset_password":
+		action = _("reset your password")
+	else:
+		action = _("sign in")
 	return {
 		"app_name": (
 			frappe.db.get_single_value("Website Settings", "app_name")
@@ -527,7 +600,7 @@ def get_otp_template_context(otp: str, context: str, full_name: str | None = Non
 			or frappe.local.site
 		),
 		"otp": otp,
-		"action": _("complete your signup") if context == "signup" else _("sign in"),
+		"action": action,
 		"expiry_minutes": max(1, ttl_seconds // 60),
 		"expiry_seconds": ttl_seconds,
 		"full_name": full_name or "",
@@ -550,6 +623,8 @@ def get_email_otp_message(otp: str, context: str) -> tuple[str, str]:
 	subject_template = settings.email_otp_subject_template or (
 		_("Verify your email – {{ app_name }}")
 		if context == "signup"
+		else _("Your password reset OTP – {{ app_name }}")
+		if context == "reset_password"
 		else _("Your Login OTP – {{ app_name }}")
 	)
 	body_template = settings.email_otp_body_template or default_email_otp_body_template()
