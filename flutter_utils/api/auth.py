@@ -11,8 +11,6 @@ from frappe.utils.password import set_encrypted_password
 OTP_PURPOSES = {"login", "signup", "reset_password"}
 OTP_CHANNELS = {"email", "mobile"}
 
-RESET_PASSWORD_COOLDOWN_SECONDS = 60
-
 
 @frappe.whitelist(allow_guest=True)
 def login(usr: str, pwd: str) -> dict:
@@ -45,6 +43,9 @@ def send_otp(
 	settings = get_flutter_utils_settings()
 	purpose = normalize_otp_purpose(purpose)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
+	
+	enforce_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
+	
 	otp = generate_otp()
 
 	if purpose == "login":
@@ -53,7 +54,6 @@ def send_otp(
 		recipient_name = user.full_name
 	elif purpose == "reset_password":
 		user = validate_reset_password_target(context)
-		enforce_reset_password_cooldown(context["recipient"])
 		payload = {"otp": otp}
 		recipient_name = user.full_name
 	else:
@@ -251,13 +251,16 @@ def validate_reset_password_target(context: dict[str, str]):
 	return frappe.get_doc("User", email)
 
 
-def enforce_reset_password_cooldown(recipient: str) -> None:
-	cooldown_key = f"reset_password_cooldown:{recipient}"
+def enforce_otp_resend_cooldown(purpose: str, channel: str, recipient: str) -> None:
+	settings = get_flutter_utils_settings()
+	cooldown_seconds = int(settings.otp_resend_cooldown_seconds or 30)
+	if cooldown_seconds <= 0:
+		return
+
+	cooldown_key = f"otp_cooldown:{purpose}:{channel}:{recipient}"
 	if otp_get(cooldown_key):
-		frappe.throw(
-			_("Please wait before requesting another password reset OTP.")
-		)
-	otp_set(cooldown_key, "1", ttl=RESET_PASSWORD_COOLDOWN_SECONDS)
+		frappe.throw(_("Please wait before requesting another OTP."))
+	otp_set(cooldown_key, "1", ttl=cooldown_seconds)
 
 
 def set_user_password(user, new_password: str | None) -> None:
@@ -306,7 +309,13 @@ def build_otp_cache_key(purpose: str, channel: str, recipient: str) -> str:
 
 
 def generate_otp() -> str:
-	return str(random.randint(100000, 999999))
+	settings = frappe.get_cached_doc("Flutter Utils Settings")
+	length = int(settings.otp_length or 4)
+	if length <= 0:
+		length = 4
+	min_val = 10 ** (length - 1)
+	max_val = (10 ** length) - 1
+	return str(random.randint(min_val, max_val))
 
 
 def _otp_cache_key(name: str) -> str:
@@ -408,6 +417,20 @@ def create_user_with_api_credentials(full_name: str, email: str, mobile_no: str 
 	user.insert(ignore_permissions=True)
 	frappe.db.commit()
 	return user, api_secret
+
+
+@frappe.whitelist(allow_guest=True)
+def get_otp_auth_settings() -> dict:
+	"""
+	Returns public OTP settings for frontend configuration (e.g., login screens).
+	"""
+	settings = get_flutter_utils_settings()
+	default_region = get_default_phone_region(settings)
+	return {
+		"otp_length": int(settings.otp_length or 4),
+		"otp_resend_cooldown_seconds": int(settings.otp_resend_cooldown_seconds or 30),
+		"otp_default_region": default_region,
+	}
 
 
 def build_auth_response(user, api_secret: str | None = None) -> dict:

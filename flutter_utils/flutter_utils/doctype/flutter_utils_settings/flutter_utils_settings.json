@@ -10,6 +10,8 @@
   "enable_mobile_otp",
   "column_break_qpmo",
   "otp_ttl_seconds",
+  "otp_resend_cooldown_seconds",
+  "otp_length",
   "otp_default_region",
   "test_mode",
   "banner_settings_section",
@@ -60,6 +62,23 @@
    "fieldtype": "Int",
    "label": "OTP TTL (Seconds)",
    "reqd": 1
+  },
+  {
+   "default": "30",
+   "description": "Cooldown period in seconds before a user can request another OTP.",
+   "fieldname": "otp_resend_cooldown_seconds",
+   "fieldtype": "Int",
+   "label": "OTP Resend Cooldown (Seconds)",
+   "reqd": 1
+  },
+  {
+   "default": "4",
+   "description": "Number of digits for generated OTPs. Usually 4 or 6.",
+   "fieldname": "otp_length",
+   "fieldtype": "Select",
+   "label": "OTP Length",
+   "reqd": 1,
+   "options": "4\n6"
   },
   {
    "description": "Used when the client sends a phone number without country code.",

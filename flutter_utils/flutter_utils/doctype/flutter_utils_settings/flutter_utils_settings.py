@@ -23,6 +23,8 @@ class FlutterUtilsSettings(Document):
 		ultramsg_base_url: DF.Data | None
 		ultramsg_instance_id: DF.Data | None
 		ultramsg_token: DF.Password | None
+		otp_length: DF.Literal["4", "6"]
+		otp_resend_cooldown_seconds: DF.Int
 		otp_ttl_seconds: DF.Int
 		otp_default_region: DF.Link | None
 		sms_otp_body_template: DF.SmallText | None
