@@ -112,7 +112,7 @@ def verify_otp(
 
 	if purpose == "login":
 		user = (
-			frappe.get_doc("User", context["recipient"])
+			get_enabled_user_by_email(context["recipient"])
 			if context["channel"] == "email"
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
@@ -120,7 +120,7 @@ def verify_otp(
 
 	if purpose == "reset_password":
 		user = (
-			frappe.get_doc("User", context["recipient"])
+			get_enabled_user_by_email(context["recipient"])
 			if context["channel"] == "email"
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
@@ -229,10 +229,7 @@ def resolve_otp_context(
 
 def validate_login_target(context: dict[str, str]):
 	if context["channel"] == "email":
-		enabled = frappe.db.get_value("User", context["recipient"], "enabled")
-		if not enabled:
-			frappe.throw(_("No active account found for this email."))
-		return frappe.get_doc("User", context["recipient"])
+		return get_enabled_user_by_email(context["recipient"])
 
 	return get_enabled_user_by_mobile(context["recipient"])
 
@@ -241,14 +238,10 @@ def validate_reset_password_target(context: dict[str, str]):
 	if context["channel"] != "email":
 		frappe.throw(_("Password reset is only available via email."))
 
-	email = context["recipient"]
-	enabled = frappe.db.get_value("User", email, "enabled")
-	if not enabled:
-		frappe.throw(_("No active account found for this email."))
-	user_type = frappe.db.get_value("User", email, "user_type")
-	if user_type == "System User" and email in ("Administrator", "Guest"):
+	user = get_enabled_user_by_email(context["recipient"])
+	if user.user_type == "System User" and user.name in ("Administrator", "Guest"):
 		frappe.throw(_("Password reset is not available for this account."))
-	return frappe.get_doc("User", email)
+	return user
 
 
 def enforce_otp_resend_cooldown(purpose: str, channel: str, recipient: str) -> None:
@@ -377,19 +370,36 @@ def get_default_phone_region(settings) -> str:
 
 
 def get_enabled_user_by_mobile(mobile_no: str):
-	users = frappe.get_all(
+	enabled_users = frappe.get_all(
 		"User",
 		filters={"mobile_no": mobile_no, "enabled": 1},
 		fields=["name"],
 		limit=2,
 	)
 
-	if not users:
-		frappe.throw(_("No active account found for this mobile number."))
-	if len(users) > 1:
+	if len(enabled_users) > 1:
 		frappe.throw(_("Multiple accounts use this mobile number. Please contact support."))
+	if enabled_users:
+		return frappe.get_doc("User", enabled_users[0].name)
 
-	return frappe.get_doc("User", users[0].name)
+	disabled_users = frappe.get_all(
+		"User",
+		filters={"mobile_no": mobile_no, "enabled": 0},
+		fields=["name"],
+		limit=1,
+	)
+	if disabled_users:
+		frappe.throw(_("Your account has been disabled. Please contact the administrator."))
+	frappe.throw(_("No active account found for this mobile number."))
+
+
+def get_enabled_user_by_email(email: str):
+	if not frappe.db.exists("User", email):
+		frappe.throw(_("No active account found for this email."))
+	enabled = frappe.db.get_value("User", email, "enabled")
+	if not enabled:
+		frappe.throw(_("Your account has been disabled. Please contact the administrator."))
+	return frappe.get_doc("User", email)
 
 
 def issue_user_api_credentials(user) -> dict:
