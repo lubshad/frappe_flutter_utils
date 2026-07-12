@@ -1,8 +1,15 @@
 import frappe
 from frappe import _
 
+from flutter_utils.patches.v1_0.add_user_workspace_sidebar_redirect import (
+	execute as add_user_workspace_sidebar_redirect,
+)
+
+
 def after_install():
 	create_default_otp_template()
+	add_user_workspace_sidebar_redirect()
+
 
 def create_default_otp_template():
 	if not frappe.db.exists("Email Template", _("OTP Email Template")):

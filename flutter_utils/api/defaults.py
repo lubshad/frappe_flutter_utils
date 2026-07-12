@@ -3,6 +3,8 @@ from typing import Any
 import frappe
 from frappe import _
 
+from flutter_utils.workspace_sidebar import get_default_workspace_sidebar
+
 
 @frappe.whitelist()
 def get_session_defaults() -> dict[str, Any]:
@@ -14,9 +16,11 @@ def get_session_defaults() -> dict[str, Any]:
 	return {
 		"user": user,
 		"user_fullname": frappe.get_cached_value("User", user, "full_name") or user,
+		"roles": frappe.get_roles(user),
 		"defaults": frappe.defaults.get_defaults(user),
 		"sysdefaults": frappe.defaults.get_defaults_for("__default"),
 		"user_permissions": frappe.defaults.get_user_permissions(user),
+		"workspace_sidebar": get_default_workspace_sidebar(user),
 	}
 
 

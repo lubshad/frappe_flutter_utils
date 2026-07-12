@@ -33,6 +33,9 @@ before_request = ["flutter_utils.utils.patch_exception_handler"]
 # before_install = "flutter_utils.install.before_install"
 after_install = "flutter_utils.install.after_install"
 
+# Direct configured Desk users to the first permitted item in their sidebar.
+on_session_creation = "flutter_utils.workspace_sidebar.redirect_to_workspace_sidebar"
+
 # Uninstallation
 # ------------
 

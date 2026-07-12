@@ -1,1 +1,2 @@
 flutter_utils.patches.v1_0.create_otp_email_template
+flutter_utils.patches.v1_0.add_user_workspace_sidebar_redirect
