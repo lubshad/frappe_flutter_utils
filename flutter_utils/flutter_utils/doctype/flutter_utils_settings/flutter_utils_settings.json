@@ -14,6 +14,16 @@
   "otp_length",
   "otp_default_region",
   "test_mode",
+  "firebase_auth_section",
+  "enable_firebase_auth",
+  "enable_firebase_phone_auth",
+  "enable_firebase_google_auth",
+  "column_break_firebase",
+  "firebase_auto_create_users",
+  "firebase_check_revoked_tokens",
+  "firebase_project_id",
+  "firebase_service_account_json",
+  "test_firebase_connection",
   "banner_settings_section",
   "default_banner_slideshow",
   "email_section",
@@ -93,6 +103,72 @@
    "fieldname": "test_mode",
    "fieldtype": "Check",
    "label": "Test Mode"
+  },
+  {
+   "fieldname": "firebase_auth_section",
+   "fieldtype": "Section Break",
+   "label": "Firebase Authentication"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_firebase_auth",
+   "fieldtype": "Check",
+   "label": "Enable Firebase Authentication"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "fieldname": "enable_firebase_phone_auth",
+   "fieldtype": "Check",
+   "label": "Enable Firebase Phone Auth"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "fieldname": "enable_firebase_google_auth",
+   "fieldtype": "Check",
+   "label": "Enable Firebase Google Auth"
+  },
+  {
+   "fieldname": "column_break_firebase",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "description": "Create a Website User when a verified Firebase identity does not match an existing user.",
+   "fieldname": "firebase_auto_create_users",
+   "fieldtype": "Check",
+   "label": "Auto-create Website Users"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "description": "Check Firebase account revocation and disabled status during login. This requires a Firebase network request.",
+   "fieldname": "firebase_check_revoked_tokens",
+   "fieldtype": "Check",
+   "label": "Check Revoked Tokens"
+  },
+  {
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "fieldname": "firebase_project_id",
+   "fieldtype": "Data",
+   "label": "Firebase Project ID",
+   "mandatory_depends_on": "eval:doc.enable_firebase_auth"
+  },
+  {
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "description": "Firebase Admin service-account JSON. Stored encrypted and never returned by public APIs.",
+   "fieldname": "firebase_service_account_json",
+   "fieldtype": "Password",
+   "label": "Firebase Service Account JSON",
+   "mandatory_depends_on": "eval:doc.enable_firebase_auth"
+  },
+  {
+   "depends_on": "eval:doc.enable_firebase_auth",
+   "fieldname": "test_firebase_connection",
+   "fieldtype": "Button",
+   "label": "Test Firebase Connection"
   },
   {
    "fieldname": "banner_settings_section",

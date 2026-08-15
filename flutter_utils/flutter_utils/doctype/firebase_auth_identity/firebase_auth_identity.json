@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-04 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_key",
+  "firebase_project_id",
+  "firebase_uid",
+  "user",
+  "last_sign_in_provider",
+  "phone_number",
+  "email"
+ ],
+ "fields": [
+  {
+   "fieldname": "identity_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Identity Key",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "firebase_project_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Firebase Project ID",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "firebase_uid",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Firebase UID",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_sign_in_provider",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Last Sign-in Provider",
+   "read_only": 1
+  },
+  {
+   "fieldname": "phone_number",
+   "fieldtype": "Data",
+   "label": "Verified Phone Number",
+   "read_only": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Verified Email",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-04 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flutter Utils",
+ "name": "Firebase Auth Identity",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

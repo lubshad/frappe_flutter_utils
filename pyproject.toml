@@ -9,6 +9,7 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
+    "firebase-admin>=7.0.0,<8",
     "phonenumbers>=8.13.0,<9",
     "requests>=2.31.0,<3",
 ]

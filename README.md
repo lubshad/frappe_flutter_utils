@@ -7,6 +7,7 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 - **Exception Handler**: Patches Frappe's default exception handler to return structured, human-readable JSON responses for Flutter clients.
 - **Email OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to email.
 - **Mobile OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to mobile using Twilio.
+- **Firebase Authentication**: Firebase ID-token verification with Frappe session, API credential, and per-request authentication modes.
 
 ## API Endpoints
 
@@ -17,6 +18,30 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 | POST | `flutter_utils.api.auth.login` | Login with email + password |
 | POST | `flutter_utils.api.auth.send_otp` | Generic OTP sender for `login` or `signup` using `email` or `mobile` |
 | POST | `flutter_utils.api.auth.verify_otp` | Generic OTP verifier for `login` or `signup` |
+| POST | `flutter_utils.api.auth.firebase_session_login` | Exchange a Firebase ID token for a Frappe session |
+| POST | `flutter_utils.api.auth.firebase_token_login` | Exchange a Firebase ID token for Frappe API credentials |
+| POST | `flutter_utils.api.auth.link_firebase_identities` | Link two recently authenticated Firebase identities to one Frappe user |
+
+Firebase identity linking requires fresh ID tokens for both accounts. The endpoint is idempotent, permits
+multiple Firebase UIDs to resolve to one Frappe user, and refuses to merge identities that already belong to
+different Frappe users. Existing Frappe users require manual business-data reconciliation before their
+identity mappings can be combined.
+
+Clients can also authenticate each API request without creating a Frappe session by sending:
+
+```http
+Authorization: Firebase <firebase-id-token>
+```
+
+The Flutter Utils authentication hook verifies the token and resolves its Firebase identity to the linked
+Frappe user for the duration of that request.
+
+```json
+{
+  "primary_id_token": "<firebase-id-token>",
+  "secondary_id_token": "<firebase-id-token>"
+}
+```
 
 Legacy wrappers still exist for backward compatibility:
 

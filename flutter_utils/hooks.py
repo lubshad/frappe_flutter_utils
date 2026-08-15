@@ -1,7 +1,7 @@
 app_name = "flutter_utils"
 app_title = "Flutter Utils"
 app_publisher = "CoreAxis Solutions"
-app_description = "Flutter utility APIs for Frappe – exception handling and email OTP authentication"
+app_description = "Flutter utility APIs for Frappe - exception handling and email OTP authentication"
 app_email = "lubshad4u4@gmail.com"
 app_license = "mit"
 
@@ -70,9 +70,7 @@ on_session_creation = "flutter_utils.workspace_sidebar.redirect_to_workspace_sid
 # Authentication and authorization
 # ---------------------------------
 
-# auth_hooks = [
-# 	"flutter_utils.auth.validate"
-# ]
+auth_hooks = ["flutter_utils.auth.validate"]
 
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True

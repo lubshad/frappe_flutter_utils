@@ -6,6 +6,7 @@ import phonenumbers
 import requests
 from frappe import _
 from frappe.email.doctype.email_account.email_account import EmailAccount
+from frappe.rate_limiter import rate_limit
 from frappe.utils.password import set_encrypted_password
 
 OTP_PURPOSES = {"login", "signup", "reset_password"}
@@ -43,9 +44,9 @@ def send_otp(
 	settings = get_flutter_utils_settings()
 	purpose = normalize_otp_purpose(purpose)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
-	
+
 	enforce_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
-	
+
 	otp = generate_otp()
 
 	if purpose == "login":
@@ -307,7 +308,7 @@ def generate_otp() -> str:
 	if length <= 0:
 		length = 4
 	min_val = 10 ** (length - 1)
-	max_val = (10 ** length) - 1
+	max_val = (10**length) - 1
 	return str(random.randint(min_val, max_val))
 
 
@@ -450,6 +451,77 @@ def build_auth_response(user, api_secret: str | None = None) -> dict:
 		"full_name": user.full_name,
 		"email": user.email,
 		"mobile_no": user.mobile_no,
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=60, methods="POST")
+def firebase_session_login(id_token: str) -> dict:
+	"""Verify Firebase identity and create a browser-compatible Frappe session."""
+	from frappe.auth import LoginManager
+
+	from flutter_utils.firebase_auth import resolve_firebase_user, verify_firebase_id_token
+
+	identity = verify_firebase_id_token(id_token)
+	user = resolve_firebase_user(identity)
+	login_manager = LoginManager()
+	login_manager.login_as(user.name)
+	return {
+		"auth_mode": "session",
+		"full_name": user.full_name,
+		"email": identity.email or user.email,
+		"mobile_no": identity.phone_number or user.mobile_no,
+		"provider": identity.provider,
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=60, methods="POST")
+def firebase_token_login(id_token: str) -> dict:
+	"""Verify Firebase identity and issue Frappe API credentials for native clients."""
+	from flutter_utils.firebase_auth import resolve_firebase_user, verify_firebase_id_token
+
+	identity = verify_firebase_id_token(id_token)
+	user = resolve_firebase_user(identity)
+	response = issue_user_api_credentials(user)
+	response.update({"auth_mode": "token", "provider": identity.provider})
+	return response
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=10, seconds=60, methods="POST")
+def link_firebase_identities(primary_id_token: str, secondary_id_token: str) -> dict:
+	"""Link two independently verified Firebase identities to one Frappe user."""
+	from flutter_utils.firebase_auth import (
+		link_firebase_identities as link_verified_identities,
+	)
+	from flutter_utils.firebase_auth import (
+		validate_recent_firebase_authentication,
+		verify_firebase_id_token,
+	)
+
+	primary_identity = verify_firebase_id_token(primary_id_token)
+	secondary_identity = verify_firebase_id_token(secondary_id_token)
+	validate_recent_firebase_authentication(primary_identity)
+	validate_recent_firebase_authentication(secondary_identity)
+	user = link_verified_identities(primary_identity, secondary_identity)
+	return {
+		"linked": True,
+		"user": user.name,
+		"firebase_uids": [primary_identity.uid, secondary_identity.uid],
+	}
+
+
+@frappe.whitelist(allow_guest=True)
+def get_firebase_auth_settings() -> dict:
+	"""Return enabled Firebase providers without exposing Firebase credentials."""
+	settings = get_flutter_utils_settings()
+	return {
+		"enabled": bool(settings.enable_firebase_auth),
+		"providers": {
+			"phone": bool(settings.enable_firebase_auth and settings.enable_firebase_phone_auth),
+			"google": bool(settings.enable_firebase_auth and settings.enable_firebase_google_auth),
+		},
 	}
 
 
@@ -654,11 +726,11 @@ def get_email_otp_message(otp: str, context: str) -> tuple[str, str]:
 	template_values = get_otp_template_context(otp=otp, context=context)
 
 	subject_template = settings.email_otp_subject_template or (
-		_("Verify your email – {{ app_name }}")
+		_("Verify your email - {{ app_name }}")
 		if context == "signup"
-		else _("Your password reset OTP – {{ app_name }}")
+		else _("Your password reset OTP - {{ app_name }}")
 		if context == "reset_password"
-		else _("Your Login OTP – {{ app_name }}")
+		else _("Your Login OTP - {{ app_name }}")
 	)
 	body_template = settings.email_otp_body_template or default_email_otp_body_template()
 

@@ -7,6 +7,8 @@ from werkzeug.wrappers import Response
 
 def _build_message_from_exception(e):
 	"""Fallback: build a human-readable message from the exception itself."""
+	if getattr(e, "error_code", None):
+		return str(e)
 	if isinstance(e, frappe.OutgoingEmailError):
 		return _("OTP email delivery is not configured. Please contact support.")
 	if isinstance(e, frappe.ValidationError):
@@ -27,6 +29,8 @@ def _build_message_from_exception(e):
 
 
 def _resolve_error_code(e):
+	if error_code := getattr(e, "error_code", None):
+		return error_code
 	if isinstance(e, frappe.OutgoingEmailError):
 		return "outgoing_email_not_configured"
 	if isinstance(e, frappe.ValidationError):
@@ -44,6 +48,8 @@ def _resolve_error_code(e):
 
 def _resolve_http_status_code(e):
 	code = getattr(e, "http_status_code", 500)
+	if getattr(e, "error_code", None):
+		return code
 	if isinstance(e, frappe.PermissionError) or isinstance(e, frappe.DoesNotExistError):
 		return 403 if isinstance(e, frappe.PermissionError) else 404
 	if isinstance(e, (frappe.AuthenticationError, frappe.SessionStopped)):
