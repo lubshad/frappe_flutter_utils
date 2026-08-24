@@ -8,6 +8,7 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 - **Email OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to email.
 - **Mobile OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to mobile using Twilio.
 - **Firebase Authentication**: Firebase ID-token verification with Frappe session, API credential, and per-request authentication modes.
+- **Multi-device Authentication**: Issues independently revocable API credentials per client installation and enforces a configurable per-user device limit.
 
 ## API Endpoints
 
@@ -21,6 +22,39 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 | POST | `flutter_utils.api.auth.firebase_session_login` | Exchange a Firebase ID token for a Frappe session |
 | POST | `flutter_utils.api.auth.firebase_token_login` | Exchange a Firebase ID token for Frappe API credentials |
 | POST | `flutter_utils.api.auth.link_firebase_identities` | Link two recently authenticated Firebase identities to one Frappe user |
+| POST | `flutter_utils.api.auth.logout_device` | Revoke the managed credential used for the current request |
+
+### Device Token Authentication
+
+Password login, OTP login/signup verification, and `firebase_token_login` require a stable random installation UUID as `device_id`. `device_name` is optional display metadata. OTP send and password-reset flows do not require device information.
+
+```json
+{
+  "usr": "user@example.com",
+  "pwd": "example-password",
+  "device_id": "ceceb8d4-16a7-47b9-baaa-5735b73086f8",
+  "device_name": "Chrome on macOS"
+}
+```
+
+Token login responses include device-specific credentials and their Frappe authorization source:
+
+```json
+{
+  "api_key": "device-api-key",
+  "api_secret": "device-api-secret",
+  "authorization_source": "Flutter Device Credential"
+}
+```
+
+Send both headers on every protected request, including `logout_device`:
+
+```http
+Authorization: token <api_key>:<api_secret>
+Frappe-Authorization-Source: Flutter Device Credential
+```
+
+`Maximum Logged-in Devices` in Flutter Utils Settings defaults to `1`. A login beyond the configured limit revokes the oldest active device credential. Lowering the setting queues background pruning of existing excess credentials. Browser `sid` sessions and `firebase_session_login` remain governed by Frappe's standard session policy.
 
 Firebase identity linking requires fresh ID tokens for both accounts. The endpoint is idempotent, permits
 multiple Firebase UIDs to resolve to one Frappe user, and refuses to merge identities that already belong to
@@ -58,6 +92,7 @@ Legacy wrappers still exist for backward compatibility:
 
 After `bench migrate`, open `Flutter Utils Settings` from Desk and configure:
 
+- `Maximum Logged-in Devices`
 - `Enable Email OTP`
 - `Enable Mobile OTP`
 - `Test Mode`
@@ -149,7 +184,9 @@ Verify:
   "purpose": "signup",
   "channel": "mobile",
   "mobile_no": "+919876543210",
-  "otp": "123456"
+  "otp": "123456",
+  "device_id": "ceceb8d4-16a7-47b9-baaa-5735b73086f8",
+  "device_name": "Android Device"
 }
 ```
 
@@ -157,4 +194,4 @@ The mobile signup API creates the Frappe `User` with:
 
 - `email` as the user ID
 - `mobile_no` populated from the verified number
-- API credentials returned after verification
+- Per-device API credentials returned after verification

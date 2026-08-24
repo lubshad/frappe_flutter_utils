@@ -1,7 +1,9 @@
 import json
+import re
 
 import frappe
 from frappe import _
+from frappe.utils import strip_html
 from werkzeug.wrappers import Response
 
 
@@ -71,6 +73,11 @@ def _first_server_message(response_data):
 	return None
 
 
+def _sanitize_message(message: str) -> str:
+	message = " ".join(strip_html(re.sub(r"<[^>]*>", " ", message)).split())
+	return re.sub(r"\s+([,.;:!?])", r"\1", message)
+
+
 def handle_exception(e):
 	"""
 	Intercepts all exceptions and returns a human-readable JSON response.
@@ -90,7 +97,7 @@ def handle_exception(e):
 	error_code = _resolve_error_code(e)
 
 	response_data["status"] = "error"
-	response_data["message"] = message
+	response_data["message"] = _sanitize_message(message)
 	response_data["error_code"] = error_code
 
 	response = Response(

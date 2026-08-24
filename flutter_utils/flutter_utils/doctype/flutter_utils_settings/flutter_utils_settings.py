@@ -27,6 +27,7 @@ class FlutterUtilsSettings(Document):
 		firebase_check_revoked_tokens: DF.Check
 		firebase_project_id: DF.Data | None
 		firebase_service_account_json: DF.Password | None
+		maximum_logged_in_devices: DF.Int
 		ultramsg_base_url: DF.Data | None
 		ultramsg_instance_id: DF.Data | None
 		ultramsg_token: DF.Password | None
@@ -42,7 +43,9 @@ class FlutterUtilsSettings(Document):
 		twilio_from_number: DF.Data | None
 	# end: auto-generated types
 
-	def validate(self):
+	def validate(self) -> None:
+		if not self.maximum_logged_in_devices or self.maximum_logged_in_devices < 1:
+			frappe.throw(_("Maximum Logged-in Devices must be at least 1."))
 		if self.otp_default_region:
 			self.otp_default_region = self.otp_default_region.strip().upper()
 		if not self.otp_ttl_seconds or self.otp_ttl_seconds < 30:
@@ -80,6 +83,20 @@ class FlutterUtilsSettings(Document):
 			)
 			if not value:
 				frappe.throw(_("{0} is required when Mobile OTP is enabled.").format(label))
+
+	def on_update(self) -> None:
+		previous = self.get_doc_before_save()
+		if not previous:
+			return
+		previous_limit = int(previous.maximum_logged_in_devices or 1)
+		new_limit = int(self.maximum_logged_in_devices)
+		if new_limit >= previous_limit:
+			return
+		frappe.enqueue(
+			"flutter_utils.device_credentials.prune_device_credentials",
+			maximum_devices=new_limit,
+			enqueue_after_commit=True,
+		)
 
 	def _validate_firebase_settings(self) -> None:
 		if not self.enable_firebase_auth:

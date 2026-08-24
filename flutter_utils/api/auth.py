@@ -1,5 +1,6 @@
 import json
 import random
+from typing import Any
 
 import frappe
 import phonenumbers
@@ -7,14 +8,20 @@ import requests
 from frappe import _
 from frappe.email.doctype.email_account.email_account import EmailAccount
 from frappe.rate_limiter import rate_limit
-from frappe.utils.password import set_encrypted_password
+
+from flutter_utils.device_credentials import (
+	hash_device_id,
+	issue_device_api_credentials,
+	logout_current_device,
+	normalize_device_name,
+)
 
 OTP_PURPOSES = {"login", "signup", "reset_password"}
 OTP_CHANNELS = {"email", "mobile"}
 
 
 @frappe.whitelist(allow_guest=True)
-def login(usr: str, pwd: str) -> dict:
+def login(usr: str, pwd: str, device_id: str, device_name: str | None = None) -> dict[str, Any]:
 	"""
 	Authenticates a user with email and password.
 	Returns api_key and api_secret for subsequent authenticated requests.
@@ -26,7 +33,7 @@ def login(usr: str, pwd: str) -> dict:
 	login_manager.post_login()
 
 	user = frappe.get_doc("User", frappe.session.user)
-	return issue_user_api_credentials(user)
+	return issue_device_api_credentials(user, device_id, device_name)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -70,6 +77,7 @@ def send_otp(
 	)
 
 	if settings.test_mode:
+		record_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
 		return build_otp_send_response(otp)
 
 	try:
@@ -84,6 +92,7 @@ def send_otp(
 		otp_delete(cache_key)
 		raise
 
+	record_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
 	return build_otp_send_response()
 
 
@@ -95,12 +104,17 @@ def verify_otp(
 	email: str | None = None,
 	mobile_no: str | None = None,
 	new_password: str | None = None,
-) -> dict:
+	device_id: str | None = None,
+	device_name: str | None = None,
+) -> dict[str, Any]:
 	"""
 	Verifies an OTP for login, signup, or reset_password and returns auth credentials on success.
 	For reset_password, new_password is required and the user's password is updated.
 	"""
 	purpose = normalize_otp_purpose(purpose)
+	if purpose in {"login", "signup"}:
+		hash_device_id(device_id)
+		normalize_device_name(device_name)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
 	cache_key = build_otp_cache_key(purpose, context["channel"], context["recipient"])
 	raw = otp_get(cache_key)
@@ -112,12 +126,13 @@ def verify_otp(
 	otp_delete(cache_key)
 
 	if purpose == "login":
+		assert device_id is not None
 		user = (
 			get_enabled_user_by_email(context["recipient"])
 			if context["channel"] == "email"
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
-		return issue_user_api_credentials(user)
+		return issue_device_api_credentials(user, device_id, device_name)
 
 	if purpose == "reset_password":
 		user = (
@@ -129,12 +144,13 @@ def verify_otp(
 		return {"message": _("Password has been reset successfully.")}
 
 	assert_signup_identity_available(data.get("email"), data.get("mobile_no"))
-	user, api_secret = create_user_with_api_credentials(
+	assert device_id is not None
+	user = create_user(
 		full_name=data["full_name"],
 		email=data["email"],
 		mobile_no=data.get("mobile_no"),
 	)
-	return build_auth_response(user, api_secret=api_secret)
+	return issue_device_api_credentials(user, device_id, device_name)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -143,8 +159,20 @@ def send_login_otp(email: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
-def verify_login_otp(email: str, otp: str) -> dict:
-	return verify_otp(purpose="login", channel="email", email=email, otp=otp)
+def verify_login_otp(
+	email: str,
+	otp: str,
+	device_id: str,
+	device_name: str | None = None,
+) -> dict[str, Any]:
+	return verify_otp(
+		purpose="login",
+		channel="email",
+		email=email,
+		otp=otp,
+		device_id=device_id,
+		device_name=device_name,
+	)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -153,8 +181,20 @@ def send_mobile_login_otp(mobile_no: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
-def verify_mobile_login_otp(mobile_no: str, otp: str) -> dict:
-	return verify_otp(purpose="login", channel="mobile", mobile_no=mobile_no, otp=otp)
+def verify_mobile_login_otp(
+	mobile_no: str,
+	otp: str,
+	device_id: str,
+	device_name: str | None = None,
+) -> dict[str, Any]:
+	return verify_otp(
+		purpose="login",
+		channel="mobile",
+		mobile_no=mobile_no,
+		otp=otp,
+		device_id=device_id,
+		device_name=device_name,
+	)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -163,8 +203,20 @@ def send_signup_otp(full_name: str, email: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
-def verify_signup_otp(email: str, otp: str) -> dict:
-	return verify_otp(purpose="signup", channel="email", email=email, otp=otp)
+def verify_signup_otp(
+	email: str,
+	otp: str,
+	device_id: str,
+	device_name: str | None = None,
+) -> dict[str, Any]:
+	return verify_otp(
+		purpose="signup",
+		channel="email",
+		email=email,
+		otp=otp,
+		device_id=device_id,
+		device_name=device_name,
+	)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -179,8 +231,20 @@ def send_mobile_signup_otp(full_name: str, email: str, mobile_no: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
-def verify_mobile_signup_otp(mobile_no: str, otp: str) -> dict:
-	return verify_otp(purpose="signup", channel="mobile", mobile_no=mobile_no, otp=otp)
+def verify_mobile_signup_otp(
+	mobile_no: str,
+	otp: str,
+	device_id: str,
+	device_name: str | None = None,
+) -> dict[str, Any]:
+	return verify_otp(
+		purpose="signup",
+		channel="mobile",
+		mobile_no=mobile_no,
+		otp=otp,
+		device_id=device_id,
+		device_name=device_name,
+	)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -246,15 +310,20 @@ def validate_reset_password_target(context: dict[str, str]):
 
 
 def enforce_otp_resend_cooldown(purpose: str, channel: str, recipient: str) -> None:
+	if otp_get(build_otp_cooldown_key(purpose, channel, recipient)):
+		frappe.throw(_("Please wait before requesting another OTP."))
+
+
+def record_otp_resend_cooldown(purpose: str, channel: str, recipient: str) -> None:
 	settings = get_flutter_utils_settings()
 	cooldown_seconds = int(settings.otp_resend_cooldown_seconds or 30)
 	if cooldown_seconds <= 0:
 		return
+	otp_set(build_otp_cooldown_key(purpose, channel, recipient), "1", ttl=cooldown_seconds)
 
-	cooldown_key = f"otp_cooldown:{purpose}:{channel}:{recipient}"
-	if otp_get(cooldown_key):
-		frappe.throw(_("Please wait before requesting another OTP."))
-	otp_set(cooldown_key, "1", ttl=cooldown_seconds)
+
+def build_otp_cooldown_key(purpose: str, channel: str, recipient: str) -> str:
+	return f"otp_cooldown:{purpose}:{channel}:{recipient}"
 
 
 def set_user_password(user, new_password: str | None) -> None:
@@ -403,18 +472,7 @@ def get_enabled_user_by_email(email: str):
 	return frappe.get_doc("User", email)
 
 
-def issue_user_api_credentials(user) -> dict:
-	api_secret = frappe.generate_hash(length=15)
-	if not user.api_key:
-		user.api_key = frappe.generate_hash(length=15)
-		user.db_set("api_key", user.api_key, update_modified=False)
-	set_encrypted_password("User", user.name, api_secret, "api_secret")
-	user.api_secret = api_secret
-	frappe.db.commit()
-	return build_auth_response(user, api_secret=api_secret)
-
-
-def create_user_with_api_credentials(full_name: str, email: str, mobile_no: str | None = None):
+def create_user(full_name: str, email: str, mobile_no: str | None = None) -> Any:
 	user = frappe.new_doc("User")
 	user.first_name = full_name
 	user.email = email
@@ -422,12 +480,8 @@ def create_user_with_api_credentials(full_name: str, email: str, mobile_no: str 
 	user.enabled = 1
 	user.new_password = frappe.generate_hash(length=20)
 	user.send_welcome_email = 0
-	user.api_key = frappe.generate_hash(length=15)
-	api_secret = frappe.generate_hash(length=15)
-	user.api_secret = api_secret
 	user.insert(ignore_permissions=True)
-	frappe.db.commit()
-	return user, api_secret
+	return user
 
 
 @frappe.whitelist(allow_guest=True)
@@ -441,16 +495,6 @@ def get_otp_auth_settings() -> dict:
 		"otp_length": int(settings.otp_length or 4),
 		"otp_resend_cooldown_seconds": int(settings.otp_resend_cooldown_seconds or 30),
 		"otp_default_region": default_region,
-	}
-
-
-def build_auth_response(user, api_secret: str | None = None) -> dict:
-	return {
-		"api_key": user.api_key,
-		"api_secret": api_secret or user.get_password("api_secret"),
-		"full_name": user.full_name,
-		"email": user.email,
-		"mobile_no": user.mobile_no,
 	}
 
 
@@ -477,15 +521,25 @@ def firebase_session_login(id_token: str) -> dict:
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=20, seconds=60, methods="POST")
-def firebase_token_login(id_token: str) -> dict:
+def firebase_token_login(
+	id_token: str,
+	device_id: str,
+	device_name: str | None = None,
+) -> dict[str, Any]:
 	"""Verify Firebase identity and issue Frappe API credentials for native clients."""
 	from flutter_utils.firebase_auth import resolve_firebase_user, verify_firebase_id_token
 
 	identity = verify_firebase_id_token(id_token)
 	user = resolve_firebase_user(identity)
-	response = issue_user_api_credentials(user)
+	response = issue_device_api_credentials(user, device_id, device_name)
 	response.update({"auth_mode": "token", "provider": identity.provider})
 	return response
+
+
+@frappe.whitelist(methods=["POST"])
+def logout_device() -> dict[str, str]:
+	"""Revoke the managed credential used for the current request."""
+	return logout_current_device()
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

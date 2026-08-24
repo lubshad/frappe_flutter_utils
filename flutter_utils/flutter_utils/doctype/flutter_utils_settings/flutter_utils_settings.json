@@ -5,6 +5,8 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "device_login_settings_section",
+  "maximum_logged_in_devices",
   "otp_settings_section",
   "enable_email_otp",
   "enable_mobile_otp",
@@ -44,6 +46,19 @@
   "send_test_message"
  ],
  "fields": [
+  {
+   "fieldname": "device_login_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Device Login Settings"
+  },
+  {
+   "default": "1",
+   "description": "Maximum number of active API-token device logins allowed per user. A new login revokes the oldest active device when this limit is reached.",
+   "fieldname": "maximum_logged_in_devices",
+   "fieldtype": "Int",
+   "label": "Maximum Logged-in Devices",
+   "reqd": 1
+  },
   {
    "fieldname": "otp_settings_section",
    "fieldtype": "Section Break",

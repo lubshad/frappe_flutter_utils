@@ -336,19 +336,24 @@ class TestFirebaseLoginEndpoints(FrappeTestCase):
 		self.assertNotIn("api_key", response)
 		self.assertNotIn("api_secret", response)
 
-	def test_token_login_uses_existing_api_credential_contract(self) -> None:
+	def test_token_login_uses_device_api_credential_contract(self) -> None:
 		with (
 			patch("flutter_utils.firebase_auth.verify_firebase_id_token", return_value=self.identity),
 			patch("flutter_utils.firebase_auth.resolve_firebase_user", return_value=self.user),
 			patch(
-				"flutter_utils.api.auth.issue_user_api_credentials",
-				return_value={"api_key": "key", "api_secret": "secret"},
+				"flutter_utils.api.auth.issue_device_api_credentials",
+				return_value={
+					"api_key": "key",
+					"api_secret": "secret",
+					"authorization_source": "Flutter Device Credential",
+				},
 			),
 		):
-			response = firebase_token_login("firebase-token")
+			response = firebase_token_login("firebase-token", "device-id", "Test Device")
 
 		self.assertEqual(response["auth_mode"], "token")
 		self.assertEqual(response["api_key"], "key")
+		self.assertEqual(response["authorization_source"], "Flutter Device Credential")
 		self.assertEqual(response["provider"], "google.com")
 
 	def test_link_endpoint_verifies_both_tokens_and_returns_uids(self) -> None:
