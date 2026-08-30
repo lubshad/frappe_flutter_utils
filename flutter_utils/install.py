@@ -1,14 +1,14 @@
 import frappe
 from frappe import _
 
-from flutter_utils.patches.v1_0.add_user_workspace_sidebar_redirect import (
-	execute as add_user_workspace_sidebar_redirect,
+from flutter_utils.patches.v1_0.remove_user_workspace_sidebar_fields import (
+	execute as remove_user_workspace_sidebar_fields,
 )
 
 
 def after_install():
 	create_default_otp_template()
-	add_user_workspace_sidebar_redirect()
+	remove_user_workspace_sidebar_fields()
 
 
 def create_default_otp_template():
