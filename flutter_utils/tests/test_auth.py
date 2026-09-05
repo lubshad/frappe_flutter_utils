@@ -90,3 +90,105 @@ class TestOtpCooldown(FrappeTestCase):
 
 		store_otp.assert_called_once()
 		record_cooldown.assert_called_once_with("login", "mobile", "+919400797246")
+
+
+class TestBrowserSessionAuthentication(FrappeTestCase):
+	def test_guest_session_context_is_anonymous(self) -> None:
+		original_user = frappe.session.user
+		try:
+			frappe.set_user("Guest")
+			self.assertEqual(
+				auth.get_session_context(),
+				{"authenticated": False, "auth_mode": "session"},
+			)
+		finally:
+			frappe.set_user(original_user)
+
+	def test_requires_password_when_email_login_setting_is_enabled(self) -> None:
+		settings = frappe._dict(require_password_for_email_login_otp=1)
+		context = {"channel": "email", "recipient": "user@example.com"}
+		user = frappe._dict(name="user@example.com")
+
+		with self.assertRaises(frappe.AuthenticationError):
+			auth.validate_login_password(user, context, None, settings)
+
+	def test_validates_password_without_creating_a_session(self) -> None:
+		settings = frappe._dict(require_password_for_email_login_otp=1)
+		context = {"channel": "email", "recipient": "user@example.com"}
+		user = frappe._dict(name="user@example.com")
+
+		with patch("frappe.auth.LoginManager") as login_manager_class:
+			verified = auth.validate_login_password(user, context, "correct-password", settings)
+
+		self.assertTrue(verified)
+		login_manager_class.return_value.authenticate.assert_called_once_with(
+			user="user@example.com", pwd="correct-password"
+		)
+		login_manager_class.return_value.post_login.assert_not_called()
+
+	def test_session_mode_does_not_require_device_credentials(self) -> None:
+		user = frappe._dict(name="user@example.com")
+		payload = '{"otp": "1234", "password_verified": true}'
+
+		with (
+			patch(
+				"flutter_utils.api.auth.resolve_otp_context",
+				return_value={"channel": "email", "recipient": "user@example.com"},
+			),
+			patch("flutter_utils.api.auth.otp_get", return_value=payload),
+			patch("flutter_utils.api.auth.otp_delete"),
+			patch("flutter_utils.api.auth.get_enabled_user_by_email", return_value=user),
+			patch(
+				"flutter_utils.api.auth.get_flutter_utils_settings",
+				return_value=frappe._dict(require_password_for_email_login_otp=1),
+			),
+			patch(
+				"flutter_utils.api.auth.create_browser_session",
+				return_value={"auth_mode": "session", "user": user.name},
+			),
+			patch("flutter_utils.api.auth.hash_device_id") as hash_device_id,
+		):
+			result = auth.verify_otp(
+				purpose="login",
+				channel="email",
+				email="user@example.com",
+				otp="1234",
+				auth_mode="session",
+			)
+
+		self.assertEqual(result, {"auth_mode": "session", "user": "user@example.com"})
+		hash_device_id.assert_not_called()
+
+	def test_token_mode_remains_the_default(self) -> None:
+		user = frappe._dict(name="user@example.com")
+		payload = '{"otp": "1234", "password_verified": false}'
+
+		with (
+			patch(
+				"flutter_utils.api.auth.resolve_otp_context",
+				return_value={"channel": "email", "recipient": "user@example.com"},
+			),
+			patch("flutter_utils.api.auth.otp_get", return_value=payload),
+			patch("flutter_utils.api.auth.otp_delete"),
+			patch("flutter_utils.api.auth.get_enabled_user_by_email", return_value=user),
+			patch(
+				"flutter_utils.api.auth.get_flutter_utils_settings",
+				return_value=frappe._dict(require_password_for_email_login_otp=0),
+			),
+			patch("flutter_utils.api.auth.hash_device_id"),
+			patch("flutter_utils.api.auth.normalize_device_name"),
+			patch(
+				"flutter_utils.api.auth.issue_device_api_credentials",
+				return_value={"api_key": "key", "api_secret": "secret"},
+			) as issue_credentials,
+		):
+			result = auth.verify_otp(
+				purpose="login",
+				channel="email",
+				email="user@example.com",
+				otp="1234",
+				device_id="00000000-0000-4000-8000-000000000000",
+			)
+
+		self.assertEqual(result["api_key"], "key")
+		issue_credentials.assert_called_once()

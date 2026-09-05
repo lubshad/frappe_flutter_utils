@@ -9,6 +9,7 @@
   "maximum_logged_in_devices",
   "otp_settings_section",
   "enable_email_otp",
+  "require_password_for_email_login_otp",
   "enable_mobile_otp",
   "column_break_qpmo",
   "otp_ttl_seconds",
@@ -69,6 +70,14 @@
    "fieldname": "enable_email_otp",
    "fieldtype": "Check",
    "label": "Enable Email OTP"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_email_otp",
+   "description": "Require a valid account password before sending an email OTP for login.",
+   "fieldname": "require_password_for_email_login_otp",
+   "fieldtype": "Check",
+   "label": "Require Password for Email Login OTP"
   },
   {
    "default": "0",

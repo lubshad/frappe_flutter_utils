@@ -18,6 +18,7 @@ from flutter_utils.device_credentials import (
 
 OTP_PURPOSES = {"login", "signup", "reset_password"}
 OTP_CHANNELS = {"email", "mobile"}
+AUTH_MODES = {"token", "session"}
 
 
 @frappe.whitelist(allow_guest=True)
@@ -36,13 +37,15 @@ def login(usr: str, pwd: str, device_id: str, device_name: str | None = None) ->
 	return issue_device_api_credentials(user, device_id, device_name)
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=10, seconds=60, methods="POST")
 def send_otp(
 	purpose: str,
 	channel: str | None = None,
 	email: str | None = None,
 	mobile_no: str | None = None,
 	full_name: str | None = None,
+	password: str | None = None,
 ) -> dict:
 	"""
 	Sends an OTP for login or signup using the configured delivery backend.
@@ -58,7 +61,8 @@ def send_otp(
 
 	if purpose == "login":
 		user = validate_login_target(context)
-		payload = {"otp": otp}
+		password_verified = validate_login_password(user, context, password, settings)
+		payload = {"otp": otp, "password_verified": password_verified}
 		recipient_name = user.full_name
 	elif purpose == "reset_password":
 		user = validate_reset_password_target(context)
@@ -96,7 +100,8 @@ def send_otp(
 	return build_otp_send_response()
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=60, methods="POST")
 def verify_otp(
 	purpose: str,
 	otp: str,
@@ -106,13 +111,17 @@ def verify_otp(
 	new_password: str | None = None,
 	device_id: str | None = None,
 	device_name: str | None = None,
+	auth_mode: str = "token",
 ) -> dict[str, Any]:
 	"""
 	Verifies an OTP for login, signup, or reset_password and returns auth credentials on success.
 	For reset_password, new_password is required and the user's password is updated.
 	"""
 	purpose = normalize_otp_purpose(purpose)
-	if purpose in {"login", "signup"}:
+	auth_mode = normalize_auth_mode(auth_mode)
+	if auth_mode == "session" and purpose != "login":
+		frappe.throw(_("Browser session authentication is only available for login."))
+	if purpose in {"login", "signup"} and auth_mode == "token":
 		hash_device_id(device_id)
 		normalize_device_name(device_name)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
@@ -126,12 +135,18 @@ def verify_otp(
 	otp_delete(cache_key)
 
 	if purpose == "login":
-		assert device_id is not None
 		user = (
 			get_enabled_user_by_email(context["recipient"])
 			if context["channel"] == "email"
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
+		if requires_password_for_login(context, get_flutter_utils_settings()) and not data.get(
+			"password_verified"
+		):
+			frappe.throw(_("Password verification is required before verifying this OTP."))
+		if auth_mode == "session":
+			return create_browser_session(user)
+		assert device_id is not None
 		return issue_device_api_credentials(user, device_id, device_name)
 
 	if purpose == "reset_password":
@@ -272,6 +287,13 @@ def normalize_otp_purpose(purpose: str) -> str:
 	return normalized
 
 
+def normalize_auth_mode(auth_mode: str) -> str:
+	normalized = (auth_mode or "token").strip().lower()
+	if normalized not in AUTH_MODES:
+		frappe.throw(_("Authentication mode must be one of: token, session."))
+	return normalized
+
+
 def resolve_otp_context(
 	channel: str | None = None, email: str | None = None, mobile_no: str | None = None
 ) -> dict[str, str]:
@@ -297,6 +319,25 @@ def validate_login_target(context: dict[str, str]):
 		return get_enabled_user_by_email(context["recipient"])
 
 	return get_enabled_user_by_mobile(context["recipient"])
+
+
+def requires_password_for_login(context: dict[str, str], settings: Any) -> bool:
+	return context["channel"] == "email" and bool(
+		getattr(settings, "require_password_for_email_login_otp", False)
+	)
+
+
+def validate_login_password(user: Any, context: dict[str, str], password: str | None, settings: Any) -> bool:
+	if not requires_password_for_login(context, settings):
+		return False
+	if not password:
+		frappe.throw(_("Password is required before requesting a login OTP."), frappe.AuthenticationError)
+
+	from frappe.auth import LoginManager
+
+	login_manager = LoginManager()
+	login_manager.authenticate(user=user.name, pwd=password)
+	return True
 
 
 def validate_reset_password_target(context: dict[str, str]):
@@ -495,6 +536,49 @@ def get_otp_auth_settings() -> dict:
 		"otp_length": int(settings.otp_length or 4),
 		"otp_resend_cooldown_seconds": int(settings.otp_resend_cooldown_seconds or 30),
 		"otp_default_region": default_region,
+		"require_password_for_email_login_otp": bool(
+			getattr(settings, "require_password_for_email_login_otp", False)
+		),
+	}
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_session_context() -> dict[str, Any]:
+	"""Return the current browser session without exposing API credentials."""
+	if frappe.session.user == "Guest":
+		return {"authenticated": False, "auth_mode": "session"}
+	return build_browser_session_response(frappe.get_doc("User", frappe.session.user))
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def logout_session() -> dict[str, str]:
+	"""End the current browser session and clear its cookies."""
+	frappe.local.login_manager.logout()
+	frappe.db.commit()
+	return {"message": _("Logged out successfully.")}
+
+
+def create_browser_session(user: Any) -> dict[str, Any]:
+	from frappe.auth import LoginManager
+
+	login_manager = LoginManager()
+	login_manager.login_as(user.name)
+	return build_browser_session_response(user)
+
+
+def build_browser_session_response(user: Any) -> dict[str, Any]:
+	from frappe.sessions import get_csrf_token
+
+	return {
+		"authenticated": True,
+		"auth_mode": "session",
+		"user": user.name,
+		"full_name": user.full_name,
+		"email": user.email,
+		"mobile_no": user.mobile_no,
+		"user_type": user.user_type,
+		"roles": sorted(frappe.get_roles(user.name)),
+		"csrf_token": get_csrf_token(),
 	}
 
 

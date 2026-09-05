@@ -5,7 +5,8 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 ## Features
 
 - **Exception Handler**: Patches Frappe's default exception handler to return structured, human-readable JSON responses for Flutter clients.
-- **Email OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to email.
+- **Email OTP Authentication**: Passwordless login and signup via configurable OTP sent to email.
+- **Browser Session Authentication**: Optional password-plus-email-OTP login using secure Frappe session cookies.
 - **Mobile OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to mobile using Twilio.
 - **Firebase Authentication**: Firebase ID-token verification with Frappe session, API credential, and per-request authentication modes.
 - **Multi-device Authentication**: Issues independently revocable API credentials per client installation and enforces a configurable per-user device limit.
@@ -23,6 +24,8 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 | POST | `flutter_utils.api.auth.firebase_token_login` | Exchange a Firebase ID token for Frappe API credentials |
 | POST | `flutter_utils.api.auth.link_firebase_identities` | Link two recently authenticated Firebase identities to one Frappe user |
 | POST | `flutter_utils.api.auth.logout_device` | Revoke the managed credential used for the current request |
+| GET | `flutter_utils.api.auth.get_session_context` | Return the authenticated browser session and CSRF token |
+| POST | `flutter_utils.api.auth.logout_session` | End the current browser session |
 
 ### Device Token Authentication
 
@@ -88,12 +91,31 @@ Legacy wrappers still exist for backward compatibility:
 - `send_mobile_signup_otp`
 - `verify_mobile_signup_otp`
 
+### Browser Password + OTP Sessions
+
+Enable `Require Password for Email Login OTP`, then request a login OTP with:
+
+```json
+{
+  "purpose": "login",
+  "channel": "email",
+  "email": "user@example.com",
+  "password": "account-password"
+}
+```
+
+Verify it with `auth_mode: "session"`. The response creates the HttpOnly Frappe session cookie and returns
+the current user, roles, and CSRF token. Browser clients must use `credentials: "include"`, send the returned
+CSRF token as `X-Frappe-CSRF-Token` on later writes, restore state through `get_session_context`, and sign out
+through `logout_session`. Token mode remains the default for existing native clients.
+
 ## Twilio Configuration
 
 After `bench migrate`, open `Flutter Utils Settings` from Desk and configure:
 
 - `Maximum Logged-in Devices`
 - `Enable Email OTP`
+- `Require Password for Email Login OTP`
 - `Enable Mobile OTP`
 - `Test Mode`
 - `OTP TTL (Seconds)`
