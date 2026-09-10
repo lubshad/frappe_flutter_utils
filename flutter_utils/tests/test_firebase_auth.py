@@ -356,6 +356,15 @@ class TestFirebaseLoginEndpoints(FrappeTestCase):
 		self.assertEqual(response["authorization_source"], "Flutter Device Credential")
 		self.assertEqual(response["provider"], "google.com")
 
+	def test_token_login_rejects_missing_device_id_before_verifying_token(self) -> None:
+		with (
+			patch("flutter_utils.firebase_auth.verify_firebase_id_token") as verify_token,
+			self.assertRaises(frappe.ValidationError),
+		):
+			firebase_token_login("firebase-token")
+
+		verify_token.assert_not_called()
+
 	def test_link_endpoint_verifies_both_tokens_and_returns_uids(self) -> None:
 		secondary_identity = VerifiedFirebaseIdentity(
 			project_id="test-project",

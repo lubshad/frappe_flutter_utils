@@ -6,6 +6,7 @@ import frappe
 import phonenumbers
 import requests
 from frappe import _
+from frappe.auth import LoginManager
 from frappe.email.doctype.email_account.email_account import EmailAccount
 from frappe.rate_limiter import rate_limit
 
@@ -21,20 +22,107 @@ OTP_CHANNELS = {"email", "mobile"}
 AUTH_MODES = {"token", "session"}
 
 
-@frappe.whitelist(allow_guest=True)
-def login(usr: str, pwd: str, device_id: str, device_name: str | None = None) -> dict[str, Any]:
-	"""
-	Authenticates a user with email and password.
-	Returns api_key and api_secret for subsequent authenticated requests.
-	"""
-	from frappe.auth import LoginManager
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=60, methods="POST")
+def login(
+	usr: str | None = None,
+	pwd: str | None = None,
+	device_id: str | None = None,
+	device_name: str | None = None,
+	auth_mode: str = "token",
+	otp: str | None = None,
+	tmp_id: str | None = None,
+) -> dict[str, Any]:
+	"""Complete native Frappe password/2FA login before returning session or device credentials."""
+	from frappe.twofactor import ExpiredLoginException
 
-	login_manager = LoginManager()
-	login_manager.authenticate(user=usr, pwd=pwd)
-	login_manager.post_login()
+	auth_mode = normalize_auth_mode(auth_mode)
+	if auth_mode == "token":
+		hash_device_id(device_id)
+		normalize_device_name(device_name)
+	if bool(otp) != bool(tmp_id):
+		frappe.throw(_("Both OTP and temporary login ID are required."), frappe.AuthenticationError)
+	if not tmp_id and not (usr and pwd):
+		frappe.throw(_("Email and password are required."), frappe.AuthenticationError)
+
+	# Native login reads these values from form_dict, including on the OTP continuation.
+	frappe.form_dict.update(usr=usr, pwd=pwd, otp=otp, tmp_id=tmp_id)
+	if not otp:
+		frappe.form_dict.pop("otp", None)
+	login_manager = frappe.local.login_manager
+	try:
+		if (
+			not tmp_id
+			and get_flutter_utils_settings().test_mode
+			and frappe.get_system_settings("two_factor_method") in ("Email", "SMS")
+		):
+			login_result = _login_with_test_otp(login_manager)
+		else:
+			login_result = login_manager.login()
+	except (frappe.AuthenticationError, ExpiredLoginException) as error:
+		if tmp_id and (
+			isinstance(error, ExpiredLoginException)
+			or frappe.local.response.get("message") == "Incomplete login details"
+		):
+			error.error_code = "login_challenge_expired"
+			error.http_status_code = 401
+			error.args = (_("Your verification session expired. Please sign in again."),)
+		raise
+	if login_result is False:
+		return {
+			"authenticated": False,
+			"auth_mode": auth_mode,
+			**{
+				key: frappe.local.response[key]
+				for key in ("verification", "tmp_id", "message", "redirect_to", "otp")
+				if key in frappe.local.response
+			},
+		}
 
 	user = frappe.get_doc("User", frappe.session.user)
+	if auth_mode == "session":
+		return build_browser_session_response(user)
+	assert device_id is not None
 	return issue_device_api_credentials(user, device_id, device_name)
+
+
+def _login_with_test_otp(login_manager: LoginManager) -> bool | None:
+	"""Mirror native LoginManager.login's first leg, replacing only challenge delivery."""
+	import pyotp
+	from frappe.twofactor import cache_2fa_data, get_otpsecret_for_, should_run_2fa
+
+	# Keep native password policy and login triggers; never patch process-global Frappe functions.
+	login_manager.run_trigger("before_login")
+	if frappe.get_system_settings("disable_user_pass_login"):
+		frappe.throw(_("Login with username and password is not allowed."), frappe.AuthenticationError)
+	frappe.clear_cache(user=frappe.form_dict.get("usr"))
+	login_manager.authenticate()
+	if login_manager.force_user_to_reset_password():
+		doc = frappe.get_doc("User", login_manager.user)
+		frappe.local.response["redirect_to"] = doc._reset_password(send_email=False, password_expired=True)
+		frappe.local.response["message"] = "Password Reset"
+		return False
+
+	if should_run_2fa(login_manager.user):
+		secret = get_otpsecret_for_(login_manager.user)
+		token = int(pyotp.TOTP(secret).now())
+		tmp_id = frappe.generate_hash(length=8)
+		cache_2fa_data(login_manager.user, token, secret, tmp_id)
+		frappe.local.response.update(
+			verification={
+				"method": frappe.get_system_settings("two_factor_method"),
+				"setup": True,
+				"token_delivery": False,
+				"prompt": _("Test mode: delivery skipped. The verification code is filled automatically."),
+			},
+			tmp_id=tmp_id,
+			otp=pyotp.HOTP(secret).at(token),
+		)
+		return False
+
+	frappe.form_dict.pop("pwd", None)
+	login_manager.post_login()
+	return None
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -45,7 +133,6 @@ def send_otp(
 	email: str | None = None,
 	mobile_no: str | None = None,
 	full_name: str | None = None,
-	password: str | None = None,
 ) -> dict:
 	"""
 	Sends an OTP for login or signup using the configured delivery backend.
@@ -53,6 +140,13 @@ def send_otp(
 	"""
 	settings = get_flutter_utils_settings()
 	purpose = normalize_otp_purpose(purpose)
+	if purpose == "login" and "password" in frappe.form_dict:
+		frappe.throw(
+			_(
+				"Password login must use flutter_utils.api.auth.login with native Frappe two-factor authentication."
+			),
+			frappe.AuthenticationError,
+		)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
 
 	enforce_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
@@ -61,8 +155,7 @@ def send_otp(
 
 	if purpose == "login":
 		user = validate_login_target(context)
-		password_verified = validate_login_password(user, context, password, settings)
-		payload = {"otp": otp, "password_verified": password_verified}
+		payload = {"otp": otp}
 		recipient_name = user.full_name
 	elif purpose == "reset_password":
 		user = validate_reset_password_target(context)
@@ -140,10 +233,6 @@ def verify_otp(
 			if context["channel"] == "email"
 			else get_enabled_user_by_mobile(context["recipient"])
 		)
-		if requires_password_for_login(context, get_flutter_utils_settings()) and not data.get(
-			"password_verified"
-		):
-			frappe.throw(_("Password verification is required before verifying this OTP."))
 		if auth_mode == "session":
 			return create_browser_session(user)
 		assert device_id is not None
@@ -319,25 +408,6 @@ def validate_login_target(context: dict[str, str]):
 		return get_enabled_user_by_email(context["recipient"])
 
 	return get_enabled_user_by_mobile(context["recipient"])
-
-
-def requires_password_for_login(context: dict[str, str], settings: Any) -> bool:
-	return context["channel"] == "email" and bool(
-		getattr(settings, "require_password_for_email_login_otp", False)
-	)
-
-
-def validate_login_password(user: Any, context: dict[str, str], password: str | None, settings: Any) -> bool:
-	if not requires_password_for_login(context, settings):
-		return False
-	if not password:
-		frappe.throw(_("Password is required before requesting a login OTP."), frappe.AuthenticationError)
-
-	from frappe.auth import LoginManager
-
-	login_manager = LoginManager()
-	login_manager.authenticate(user=user.name, pwd=password)
-	return True
 
 
 def validate_reset_password_target(context: dict[str, str]):
@@ -536,9 +606,6 @@ def get_otp_auth_settings() -> dict:
 		"otp_length": int(settings.otp_length or 4),
 		"otp_resend_cooldown_seconds": int(settings.otp_resend_cooldown_seconds or 30),
 		"otp_default_region": default_region,
-		"require_password_for_email_login_otp": bool(
-			getattr(settings, "require_password_for_email_login_otp", False)
-		),
 	}
 
 
@@ -607,12 +674,14 @@ def firebase_session_login(id_token: str) -> dict:
 @rate_limit(limit=20, seconds=60, methods="POST")
 def firebase_token_login(
 	id_token: str,
-	device_id: str,
+	device_id: str | None = None,
 	device_name: str | None = None,
 ) -> dict[str, Any]:
 	"""Verify Firebase identity and issue Frappe API credentials for native clients."""
 	from flutter_utils.firebase_auth import resolve_firebase_user, verify_firebase_id_token
 
+	hash_device_id(device_id)
+	assert device_id is not None
 	identity = verify_firebase_id_token(id_token)
 	user = resolve_firebase_user(identity)
 	response = issue_device_api_credentials(user, device_id, device_name)

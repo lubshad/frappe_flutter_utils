@@ -6,7 +6,7 @@ Flutter utility APIs for Frappe – exception handling and email/SMS OTP authent
 
 - **Exception Handler**: Patches Frappe's default exception handler to return structured, human-readable JSON responses for Flutter clients.
 - **Email OTP Authentication**: Passwordless login and signup via configurable OTP sent to email.
-- **Browser Session Authentication**: Optional password-plus-email-OTP login using secure Frappe session cookies.
+- **Native Password + 2FA Authentication**: Frappe-managed email/password login with Email, SMS, or OTP App verification, returning browser sessions or managed device credentials.
 - **Mobile OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to mobile using Twilio.
 - **Firebase Authentication**: Firebase ID-token verification with Frappe session, API credential, and per-request authentication modes.
 - **Multi-device Authentication**: Issues independently revocable API credentials per client installation and enforces a configurable per-user device limit.
@@ -91,23 +91,75 @@ Legacy wrappers still exist for backward compatibility:
 - `send_mobile_signup_otp`
 - `verify_mobile_signup_otp`
 
-### Browser Password + OTP Sessions
+### Native Password + 2FA Login
 
-Enable `Require Password for Email Login OTP`, then request a login OTP with:
+Configure **System Settings > Two Factor Authentication** and the applicable roles in Frappe.
+Flutter Utils does not override the native method, expiry, enrollment, or attempt tracking.
+When 2FA does not apply to the user, password login completes immediately.
+
+POST `/api/method/flutter_utils.api.auth.login`:
 
 ```json
 {
-  "purpose": "login",
-  "channel": "email",
-  "email": "user@example.com",
-  "password": "account-password"
+  "usr": "user@example.com",
+  "pwd": "account-password",
+  "auth_mode": "session"
 }
 ```
 
-Verify it with `auth_mode: "session"`. The response creates the HttpOnly Frappe session cookie and returns
-the current user, roles, and CSRF token. Browser clients must use `credentials: "include"`, send the returned
-CSRF token as `X-Frappe-CSRF-Token` on later writes, restore state through `get_session_context`, and sign out
-through `logout_session`. Token mode remains the default for existing native clients.
+If verification is required, the API's `message` object contains a challenge, not credentials:
+
+```json
+{
+  "message": {
+    "authenticated": false,
+    "auth_mode": "session",
+    "verification": {"method": "OTP App", "setup": true},
+    "tmp_id": "temporary-login-id"
+  }
+}
+```
+
+Display Frappe's verification prompt and submit to the **same endpoint**:
+
+```json
+{
+  "otp": "012345",
+  "tmp_id": "temporary-login-id",
+  "auth_mode": "session"
+}
+```
+
+Keep OTPs as strings to preserve leading zeros. First-time OTP App enrollment uses Frappe's emailed
+QR-code link; do not interpret its initial Email prompt as a change in the configured method.
+An expired challenge requires starting login again. A password-reset response must be handled before
+login can complete. HTTP 200 alone does not mean the user is authenticated.
+
+After successful verification, session mode returns the current user, roles, and CSRF token inside
+`message`, with the Frappe session cookie. Browser clients must use `credentials: "include"`, send
+`X-Frappe-CSRF-Token` on later writes, restore state through `get_session_context`, and sign out through
+`logout_session`.
+
+For device credentials, use `auth_mode: "token"` (the default) and include the same persistent
+`device_id` and optional `device_name` on both requests. Credentials are issued only after native login
+completes. The existing device-token response and authorization headers are unchanged.
+
+**Migration:** The former `Require Password for Email Login OTP` setting and `password` argument to
+`send_otp` have been removed. Move password-login clients from `send_otp`/`verify_otp` to `login`, and
+configure native Frappe 2FA before rollout; the removed setting does not enable native 2FA automatically.
+Run `bench --site <site> migrate` to sync the settings schema.
+
+Passwordless email/mobile OTP, signup/reset, and Firebase authentication remain separate flows and do
+not enforce native Frappe password-login 2FA. Flutter Utils OTP length and templates apply only to
+those custom OTP flows, not native 2FA. Existing session/device credentials are not revoked by this
+change.
+
+For `flutter_utils.api.auth.login`, `Test Mode` also skips native Email/SMS challenge delivery and
+returns the six-digit code as `otp` beside `tmp_id` and `verification`. Clients can prefill the code
+and must still submit it with `tmp_id` to complete login. Password checks, native challenge expiry,
+and OTP verification remain enforced. Authenticator-app setup/verification and direct Frappe Desk
+login are unchanged. Disable `Test Mode` for real two-factor protection; normal mode never returns
+the challenge code.
 
 ## Twilio Configuration
 
@@ -115,7 +167,6 @@ After `bench migrate`, open `Flutter Utils Settings` from Desk and configure:
 
 - `Maximum Logged-in Devices`
 - `Enable Email OTP`
-- `Require Password for Email Login OTP`
 - `Enable Mobile OTP`
 - `Test Mode`
 - `OTP TTL (Seconds)`

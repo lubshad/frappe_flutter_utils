@@ -22,7 +22,6 @@ class FlutterUtilsSettings(Document):
 		enable_firebase_google_auth: DF.Check
 		enable_firebase_phone_auth: DF.Check
 		enable_mobile_otp: DF.Check
-		require_password_for_email_login_otp: DF.Check
 		default_banner_slideshow: DF.Link | None
 		firebase_auto_create_users: DF.Check
 		firebase_check_revoked_tokens: DF.Check
