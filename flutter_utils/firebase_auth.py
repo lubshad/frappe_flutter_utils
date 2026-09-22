@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import frappe
-from firebase_admin import auth, credentials, get_app, initialize_app
+from firebase_admin import auth
 from frappe import _
 
 from flutter_utils.flutter_utils.doctype.firebase_auth_identity.firebase_auth_identity import (
@@ -53,23 +53,17 @@ def parse_service_account_json(raw_credentials: str | None) -> dict[str, Any]:
 
 
 def get_firebase_app(settings: Any | None = None):
-	settings = settings or _get_enabled_firebase_settings()
-	service_account = parse_service_account_json(settings.get_password("firebase_service_account_json"))
-	project_id = settings.firebase_project_id.strip()
-	app_name = _get_firebase_app_name(project_id, service_account)
+	from flutter_utils.firebase import get_firebase_app as initialize_configured_app
 
+	settings = settings or _get_enabled_firebase_settings()
 	try:
-		return get_app(app_name)
-	except ValueError:
-		try:
-			credential = credentials.Certificate(service_account)
-			return initialize_app(credential, {"projectId": project_id}, name=app_name)
-		except (TypeError, ValueError) as exc:
-			raise FirebaseAuthError(
-				_("Firebase Authentication is not configured correctly."),
-				"firebase_configuration_error",
-				503,
-			) from exc
+		return initialize_configured_app(settings)
+	except (TypeError, ValueError) as exc:
+		raise FirebaseAuthError(
+			_("Firebase Authentication is not configured correctly."),
+			"firebase_configuration_error",
+			503,
+		) from exc
 
 
 def verify_firebase_id_token(id_token: str) -> VerifiedFirebaseIdentity:
@@ -264,18 +258,6 @@ def _get_enabled_firebase_settings():
 	if not settings.enable_firebase_auth:
 		raise FirebaseAuthError(_("Firebase Authentication is disabled."), "firebase_auth_disabled", 403)
 	return settings
-
-
-def _get_firebase_app_name(project_id: str, service_account: dict[str, Any]) -> str:
-	fingerprint_source = ":".join(
-		[
-			frappe.local.site,
-			project_id,
-			str(service_account.get("client_email") or ""),
-			str(service_account.get("private_key_id") or ""),
-		]
-	)
-	return f"flutter-utils-{hashlib.sha256(fingerprint_source.encode()).hexdigest()[:24]}"
 
 
 def _validate_provider(settings: Any, provider: str) -> None:

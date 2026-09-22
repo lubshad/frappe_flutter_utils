@@ -99,10 +99,14 @@ class FlutterUtilsSettings(Document):
 		)
 
 	def _validate_firebase_settings(self) -> None:
-		if not self.enable_firebase_auth:
+		if not self.enable_firebase_auth and not self.get("enable_firebase_push"):
 			return
 
-		if not self.enable_firebase_phone_auth and not self.enable_firebase_google_auth:
+		if (
+			self.enable_firebase_auth
+			and not self.enable_firebase_phone_auth
+			and not self.enable_firebase_google_auth
+		):
 			frappe.throw(_("Enable Firebase Phone Auth or Firebase Google Auth."))
 
 		if not self.firebase_project_id or not self.firebase_project_id.strip():

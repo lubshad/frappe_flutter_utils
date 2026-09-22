@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from flutter_utils.patches.v1_0.merge_push_registration import execute as merge_push_registration
 from flutter_utils.patches.v1_0.remove_user_workspace_sidebar_fields import (
 	execute as remove_user_workspace_sidebar_fields,
 )
@@ -9,6 +10,7 @@ from flutter_utils.patches.v1_0.remove_user_workspace_sidebar_fields import (
 def after_install():
 	create_default_otp_template()
 	remove_user_workspace_sidebar_fields()
+	merge_push_registration()
 
 
 def create_default_otp_template():

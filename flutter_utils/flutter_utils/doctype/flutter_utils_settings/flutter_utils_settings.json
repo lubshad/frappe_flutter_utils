@@ -18,6 +18,7 @@
   "test_mode",
   "firebase_auth_section",
   "enable_firebase_auth",
+  "enable_firebase_push",
   "enable_firebase_phone_auth",
   "enable_firebase_google_auth",
   "column_break_firebase",
@@ -122,13 +123,19 @@
   {
    "fieldname": "firebase_auth_section",
    "fieldtype": "Section Break",
-   "label": "Firebase Authentication"
+   "label": "Firebase"
   },
   {
    "default": "0",
    "fieldname": "enable_firebase_auth",
    "fieldtype": "Check",
    "label": "Enable Firebase Authentication"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_firebase_push",
+   "fieldtype": "Check",
+   "label": "Enable Firebase Push"
   },
   {
    "default": "0",
@@ -165,19 +172,19 @@
    "label": "Check Revoked Tokens"
   },
   {
-   "depends_on": "eval:doc.enable_firebase_auth",
+   "depends_on": "eval:doc.enable_firebase_auth || doc.enable_firebase_push",
    "fieldname": "firebase_project_id",
    "fieldtype": "Data",
    "label": "Firebase Project ID",
-   "mandatory_depends_on": "eval:doc.enable_firebase_auth"
+   "mandatory_depends_on": "eval:doc.enable_firebase_auth || doc.enable_firebase_push"
   },
   {
-   "depends_on": "eval:doc.enable_firebase_auth",
+   "depends_on": "eval:doc.enable_firebase_auth || doc.enable_firebase_push",
    "description": "Firebase Admin service-account JSON. Stored encrypted and never returned by public APIs.",
    "fieldname": "firebase_service_account_json",
    "fieldtype": "Password",
    "label": "Firebase Service Account JSON",
-   "mandatory_depends_on": "eval:doc.enable_firebase_auth"
+   "mandatory_depends_on": "eval:doc.enable_firebase_auth || doc.enable_firebase_push"
   },
   {
    "depends_on": "eval:doc.enable_firebase_auth",
@@ -304,7 +311,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-09-22 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Flutter Utils",
  "name": "Flutter Utils Settings",

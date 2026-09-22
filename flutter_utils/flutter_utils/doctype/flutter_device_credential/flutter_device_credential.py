@@ -27,4 +27,8 @@ class FlutterDeviceCredential(Document):
 		user: DF.Link
 	# end: auto-generated types
 
-	pass
+	def on_update(self) -> None:
+		if not self.enabled:
+			from flutter_utils.push_notifications import deactivate_device_push
+
+			deactivate_device_push(self.name)

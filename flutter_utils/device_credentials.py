@@ -1,10 +1,11 @@
 import hashlib
+import hmac
 from typing import Any
 
 import frappe
 from frappe import _
 from frappe.utils import now_datetime
-from frappe.utils.password import set_encrypted_password
+from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
 AUTHORIZATION_SOURCE = "Flutter Device Credential"
 MAX_DEVICE_ID_LENGTH = 128
@@ -95,6 +96,15 @@ def normalize_device_name(device_name: str | None) -> str | None:
 
 
 def logout_current_device() -> dict[str, str]:
+	credential_name = get_current_device_credential()
+	_revoke_credential(credential_name, "Device Logout")
+	return {"message": _("Device logged out successfully.")}
+
+
+def get_current_device_credential() -> str:
+	"""Resolve only the enabled credential belonging to the authenticated caller."""
+	if frappe.session.user == "Guest":
+		raise frappe.AuthenticationError
 	auth_source = frappe.get_request_header("Frappe-Authorization-Source", "")
 	if auth_source != AUTHORIZATION_SOURCE:
 		frappe.throw(_("This credential is not a managed device login."), frappe.AuthenticationError)
@@ -102,17 +112,21 @@ def logout_current_device() -> dict[str, str]:
 	auth_type, separator, auth_token = frappe.get_request_header("Authorization", "").partition(" ")
 	if auth_type.lower() != "token" or not separator or ":" not in auth_token:
 		raise frappe.AuthenticationError
-	api_key = auth_token.split(":", 1)[0]
+	api_key, separator, api_secret = auth_token.partition(":")
 	credential_name = frappe.db.get_value(
 		AUTHORIZATION_SOURCE,
 		{"api_key": api_key, "enabled": 1, "user": frappe.session.user},
 		"name",
 	)
-	if not credential_name:
+	if not credential_name or not frappe.db.get_value("User", frappe.session.user, "enabled"):
+		raise frappe.AuthenticationError
+	expected = get_decrypted_password(
+		AUTHORIZATION_SOURCE, credential_name, "api_secret", raise_exception=False
+	)
+	if not api_secret or not expected or not hmac.compare_digest(expected.encode(), api_secret.encode()):
 		raise frappe.AuthenticationError
 
-	_revoke_credential(credential_name, "Device Logout")
-	return {"message": _("Device logged out successfully.")}
+	return str(credential_name)
 
 
 def prune_device_credentials(maximum_devices: int) -> None:
@@ -149,6 +163,10 @@ def _revoke_for_available_slot(credentials: list[Any], maximum_devices: int) -> 
 
 
 def _revoke_credential(credential_name: str, reason: str) -> None:
+	from flutter_utils.push_notifications import deactivate_device_push
+
+	frappe.db.get_value(AUTHORIZATION_SOURCE, credential_name, "name", for_update=True)
+	deactivate_device_push(credential_name)
 	frappe.db.set_value(
 		AUTHORIZATION_SOURCE,
 		credential_name,

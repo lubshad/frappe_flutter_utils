@@ -268,3 +268,8 @@ The mobile signup API creates the Frappe `User` with:
 - `email` as the user ID
 - `mobile_no` populated from the verified number
 - Per-device API credentials returned after verification
+# Firebase push notifications
+
+Reusable managed-device registration and queued Firebase delivery are documented in
+[PUSH_NOTIFICATIONS.md](PUSH_NOTIFICATIONS.md). Push uses the existing Firebase
+service account in Flutter Utils Settings and requires Flutter Device Credential authentication.
