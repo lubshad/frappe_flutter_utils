@@ -105,16 +105,17 @@ def send_push_notifications(
 	body: str,
 	app: str | None = None,
 	data: dict[str, str] | None = None,
-) -> None:
+	strict: bool = False,
+) -> bool | None:
 	"""Worker-only delivery; FCM failures never affect the originating transaction."""
 	if not users:
-		return
+		return False if strict else None
 	settings = frappe.get_single("Flutter Utils Settings")
 	if not settings.get("enable_firebase_push") or not users:
-		return
+		return False if strict else None
 	enabled_users = frappe.get_all("User", filters={"name": ["in", users], "enabled": 1}, pluck="name")
 	if not enabled_users:
-		return
+		return False if strict else None
 	filters: dict[str, Any] = {"user": ["in", enabled_users], "enabled": 1, "push_enabled": 1}
 	if app:
 		filters["app"] = app
@@ -123,13 +124,14 @@ def send_push_notifications(
 	)
 	rows = [row for row in rows if row.fcm_token]
 	if not rows:
-		return
+		return False if strict else None
 	try:
 		from firebase_admin import messaging
 
 		from flutter_utils.firebase import get_firebase_app
 
 		firebase_app = get_firebase_app(settings)
+		failed = False
 		for offset in range(0, len(rows), 500):
 			batch = rows[offset : offset + 500]
 			result = messaging.send_each_for_multicast(
@@ -156,12 +158,18 @@ def send_push_notifications(
 						update_modified=False,
 					)
 				else:
+					failed = True
 					frappe.log_error(
 						title="Firebase Push Delivery Failed",
 						message="FCM rejected a delivery. Check Firebase project configuration.",
 					)
+		if strict and failed:
+			raise RuntimeError("PushDeliveryFailed")
+		return True if strict else None
 	except Exception as exc:
 		frappe.log_error(
 			title="Firebase Push Delivery Failed",
 			message=f"FCM delivery failed ({type(exc).__name__}). Check Firebase settings and connectivity.",
 		)
+		if strict:
+			raise RuntimeError("PushDeliveryFailed") from exc

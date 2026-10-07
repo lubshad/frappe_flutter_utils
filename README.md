@@ -278,3 +278,17 @@ The mobile signup API creates the Frappe `User` with:
 Reusable managed-device registration and queued Firebase delivery are documented in
 [PUSH_NOTIFICATIONS.md](PUSH_NOTIFICATIONS.md). Push uses the existing Firebase
 service account in Flutter Utils Settings and requires Flutter Device Credential authentication.
+
+# App release settings
+
+Android and iOS release state is documented in
+[App release settings](docs/app-settings.md). The `App Settings` tab of Flutter Utils
+Settings publishes current version, minimum version, forced updates, and temporary
+unavailability per platform.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `flutter_utils.api.app_settings.get_app_config` | Public Android/iOS release state for pre-login update and maintenance screens |
+
+This state is advisory. No endpoint is blocked and no credential is revoked, so a
+misconfigured minimum version can never lock users out of the API.

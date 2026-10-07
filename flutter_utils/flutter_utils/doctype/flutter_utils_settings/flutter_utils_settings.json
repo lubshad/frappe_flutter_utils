@@ -5,6 +5,33 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "app_settings_tab",
+  "app_settings_section",
+  "enable_app_settings",
+  "app_identifier",
+  "app_support_email",
+  "app_support_url",
+  "android_section",
+  "android_store_url",
+  "android_current_version",
+  "column_break_android",
+  "android_minimum_version",
+  "android_force_update",
+  "android_unavailable",
+  "android_unavailable_message",
+  "android_release_notes_url",
+  "android_released_on",
+  "ios_section",
+  "ios_store_url",
+  "ios_current_version",
+  "column_break_ios",
+  "ios_minimum_version",
+  "ios_force_update",
+  "ios_unavailable",
+  "ios_unavailable_message",
+  "ios_release_notes_url",
+  "ios_released_on",
+  "authentication_tab",
   "device_login_settings_section",
   "maximum_logged_in_devices",
   "otp_settings_section",
@@ -27,6 +54,7 @@
   "firebase_project_id",
   "firebase_service_account_json",
   "test_firebase_connection",
+  "email_and_sms_tab",
   "banner_settings_section",
   "default_banner_slideshow",
   "email_section",
@@ -47,6 +75,173 @@
   "send_test_message"
  ],
  "fields": [
+  {
+   "fieldname": "app_settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "App Settings"
+  },
+  {
+   "fieldname": "app_settings_section",
+   "fieldtype": "Section Break",
+   "label": "App Settings"
+  },
+  {
+   "default": "0",
+   "description": "Publish Android and iOS release state through flutter_utils.api.app_settings.get_app_config. While disabled, clients are always reported as up to date and available.",
+   "fieldname": "enable_app_settings",
+   "fieldtype": "Check",
+   "label": "Enable App Settings"
+  },
+  {
+   "description": "Identifier published with the app config. Use the same value clients send to flutter_utils.api.push_notifications.register_push_device.",
+   "fieldname": "app_identifier",
+   "fieldtype": "Data",
+   "label": "Application Identifier",
+   "mandatory_depends_on": "eval:doc.enable_app_settings"
+  },
+  {
+   "description": "Shown to users on the update and unavailable screens.",
+   "fieldname": "app_support_email",
+   "fieldtype": "Data",
+   "label": "Support Email",
+   "options": "Email"
+  },
+  {
+   "description": "Shown to users on the update and unavailable screens.",
+   "fieldname": "app_support_url",
+   "fieldtype": "Data",
+   "label": "Support URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "android_section",
+   "fieldtype": "Section Break",
+   "label": "Android"
+  },
+  {
+   "description": "Google Play listing opened by the client's update action.",
+   "fieldname": "android_store_url",
+   "fieldtype": "Data",
+   "label": "Play Store URL",
+   "options": "URL"
+  },
+  {
+   "description": "Latest version published to the Play Store. Comparison is numeric per dot-separated part, so 1.10.0 is newer than 1.9.0.",
+   "fieldname": "android_current_version",
+   "fieldtype": "Data",
+   "label": "Current Version",
+   "mandatory_depends_on": "eval:doc.enable_app_settings"
+  },
+  {
+   "fieldname": "column_break_android",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Oldest version allowed to keep using the app. Older clients are reported as update_required. Leave empty to only report update_available.",
+   "fieldname": "android_minimum_version",
+   "fieldtype": "Data",
+   "label": "Minimum Version"
+  },
+  {
+   "default": "0",
+   "description": "Clients below the minimum version should show a non-dismissable update screen instead of a dismissable prompt.",
+   "fieldname": "android_force_update",
+   "fieldtype": "Check",
+   "label": "Force Update"
+  },
+  {
+   "default": "0",
+   "description": "Report Android clients as unavailable so they show a maintenance screen. Advisory only; the server keeps serving every API.",
+   "fieldname": "android_unavailable",
+   "fieldtype": "Check",
+   "label": "Temporarily Unavailable"
+  },
+  {
+   "description": "Message shown on the maintenance screen. A default message is used when this is empty.",
+   "fieldname": "android_unavailable_message",
+   "fieldtype": "Small Text",
+   "label": "Unavailable Message",
+   "depends_on": "eval:doc.android_unavailable"
+  },
+  {
+   "description": "Optional link to the changelog for the current version.",
+   "fieldname": "android_release_notes_url",
+   "fieldtype": "Data",
+   "label": "Release Notes URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "android_released_on",
+   "fieldtype": "Date",
+   "label": "Released On"
+  },
+  {
+   "fieldname": "ios_section",
+   "fieldtype": "Section Break",
+   "label": "iOS"
+  },
+  {
+   "description": "App Store listing opened by the client's update action.",
+   "fieldname": "ios_store_url",
+   "fieldtype": "Data",
+   "label": "App Store URL",
+   "options": "URL"
+  },
+  {
+   "description": "Latest version published to the App Store. Comparison is numeric per dot-separated part, so 1.10.0 is newer than 1.9.0.",
+   "fieldname": "ios_current_version",
+   "fieldtype": "Data",
+   "label": "Current Version",
+   "mandatory_depends_on": "eval:doc.enable_app_settings"
+  },
+  {
+   "fieldname": "column_break_ios",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Oldest version allowed to keep using the app. Older clients are reported as update_required. Leave empty to only report update_available.",
+   "fieldname": "ios_minimum_version",
+   "fieldtype": "Data",
+   "label": "Minimum Version"
+  },
+  {
+   "default": "0",
+   "description": "Clients below the minimum version should show a non-dismissable update screen instead of a dismissable prompt.",
+   "fieldname": "ios_force_update",
+   "fieldtype": "Check",
+   "label": "Force Update"
+  },
+  {
+   "default": "0",
+   "description": "Report iOS clients as unavailable so they show a maintenance screen. Advisory only; the server keeps serving every API.",
+   "fieldname": "ios_unavailable",
+   "fieldtype": "Check",
+   "label": "Temporarily Unavailable"
+  },
+  {
+   "description": "Message shown on the maintenance screen. A default message is used when this is empty.",
+   "fieldname": "ios_unavailable_message",
+   "fieldtype": "Small Text",
+   "label": "Unavailable Message",
+   "depends_on": "eval:doc.ios_unavailable"
+  },
+  {
+   "description": "Optional link to the changelog for the current version.",
+   "fieldname": "ios_release_notes_url",
+   "fieldtype": "Data",
+   "label": "Release Notes URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "ios_released_on",
+   "fieldtype": "Date",
+   "label": "Released On"
+  },
+  {
+   "fieldname": "authentication_tab",
+   "fieldtype": "Tab Break",
+   "label": "Authentication"
+  },
   {
    "fieldname": "device_login_settings_section",
    "fieldtype": "Section Break",
@@ -193,6 +388,11 @@
    "label": "Test Firebase Connection"
   },
   {
+   "fieldname": "email_and_sms_tab",
+   "fieldtype": "Tab Break",
+   "label": "Email & SMS"
+  },
+  {
    "fieldname": "banner_settings_section",
    "fieldtype": "Section Break",
    "label": "Banner Settings"
@@ -311,7 +511,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-22 12:00:00.000000",
+ "modified": "2026-10-06 13:52:00.000000",
  "modified_by": "Administrator",
  "module": "Flutter Utils",
  "name": "Flutter Utils Settings",
