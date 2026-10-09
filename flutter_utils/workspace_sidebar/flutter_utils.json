@@ -51,15 +51,6 @@
    "icon": "user",
    "indent": 0,
    "collapsible": 1
-  },
-  {
-   "type": "Link",
-   "label": "Verification Review Log",
-   "link_type": "DocType",
-   "link_to": "Verification Review Log",
-   "icon": "history",
-   "indent": 0,
-   "collapsible": 1
   }
  ],
  "owner": "Administrator",

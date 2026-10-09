@@ -7,7 +7,7 @@
  "link_type": "Workspace Sidebar",
  "link_to": "Flutter Utils",
  "sidebar": "Flutter Utils",
- "bg_color": "grey",
+ "bg_color": "gray",
  "hidden": 0,
  "standard": 1,
  "roles": [{"role": "System Manager"}],
