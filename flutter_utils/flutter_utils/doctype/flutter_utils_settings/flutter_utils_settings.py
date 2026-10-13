@@ -32,6 +32,11 @@ class FlutterUtilsSettings(Document):
 		app_identifier: DF.Data | None
 		app_support_email: DF.Data | None
 		app_support_url: DF.Data | None
+		apns_team_id: DF.Data | None
+		apns_key_id: DF.Data | None
+		apns_private_key: DF.Password | None
+		apns_voip_bundle_id: DF.Data | None
+		apns_use_sandbox: DF.Check
 		email_otp_body_template: DF.TextEditor | None
 		email_otp_subject_template: DF.Data | None
 		enable_app_settings: DF.Check
@@ -41,6 +46,8 @@ class FlutterUtilsSettings(Document):
 		enable_firebase_phone_auth: DF.Check
 		enable_mobile_otp: DF.Check
 		default_banner_slideshow: DF.Link | None
+		member_banner_slideshow: DF.Link | None
+		listener_banner_slideshow: DF.Link | None
 		firebase_auto_create_users: DF.Check
 		firebase_check_revoked_tokens: DF.Check
 		firebase_project_id: DF.Data | None
@@ -54,6 +61,11 @@ class FlutterUtilsSettings(Document):
 		ios_unavailable: DF.Check
 		ios_unavailable_message: DF.SmallText | None
 		maximum_logged_in_devices: DF.Int
+		meta_access_token: DF.Password | None
+		meta_graph_api_version: DF.Data | None
+		meta_whatsapp_otp_template_language: DF.Data | None
+		meta_whatsapp_otp_template_name: DF.Data | None
+		meta_whatsapp_phone_number_id: DF.Data | None
 		ultramsg_base_url: DF.Data | None
 		ultramsg_instance_id: DF.Data | None
 		ultramsg_token: DF.Password | None
@@ -62,7 +74,7 @@ class FlutterUtilsSettings(Document):
 		otp_ttl_seconds: DF.Int
 		otp_default_region: DF.Link | None
 		sms_otp_body_template: DF.SmallText | None
-		sms_gateway: DF.Literal["", "Twilio", "UltraMsg"] | None
+		sms_gateway: DF.Literal["", "Twilio", "UltraMsg", "WhatsApp (Meta)"] | None
 		test_mode: DF.Check
 		twilio_account_sid: DF.Data | None
 		twilio_auth_token: DF.Password | None
@@ -87,9 +99,10 @@ class FlutterUtilsSettings(Document):
 		if not self.enable_mobile_otp or self.test_mode:
 			return
 
-		if self.sms_gateway not in {"Twilio", "UltraMsg"}:
+		if self.sms_gateway not in {"Twilio", "UltraMsg", "WhatsApp (Meta)"}:
 			frappe.throw(_("Select a supported SMS gateway before enabling Mobile OTP."))
 
+		password_fields = {"twilio_auth_token", "ultramsg_token", "meta_access_token"}
 		required_fields = {}
 		if self.sms_gateway == "Twilio":
 			required_fields = {
@@ -102,12 +115,18 @@ class FlutterUtilsSettings(Document):
 				"ultramsg_instance_id": _("UltraMsg Instance ID"),
 				"ultramsg_token": _("UltraMsg Token"),
 			}
+		elif self.sms_gateway == "WhatsApp (Meta)":
+			if not self.meta_whatsapp_otp_template_language:
+				self.meta_whatsapp_otp_template_language = "en_US"
+			required_fields = {
+				"meta_whatsapp_phone_number_id": _("WhatsApp Phone Number ID"),
+				"meta_access_token": _("Meta Access Token"),
+				"meta_whatsapp_otp_template_name": _("WhatsApp OTP Template Name"),
+			}
 
 		for fieldname, label in required_fields.items():
 			value = (
-				self.get_password(fieldname)
-				if fieldname in {"twilio_auth_token", "ultramsg_token"}
-				else self.get(fieldname)
+				self.get_password(fieldname) if fieldname in password_fields else self.get(fieldname)
 			)
 			if not value:
 				frappe.throw(_("{0} is required when Mobile OTP is enabled.").format(label))
@@ -210,3 +229,9 @@ class FlutterUtilsSettings(Document):
 		from flutter_utils.firebase_auth import test_firebase_connection
 
 		return test_firebase_connection()
+
+	@frappe.whitelist()
+	def test_meta_connection(self) -> dict:
+		from flutter_utils.api.auth import test_meta_connection
+
+		return test_meta_connection()

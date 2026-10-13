@@ -795,6 +795,17 @@ def send_otp_sms(mobile_no: str, otp: str, context: str, full_name: str | None =
 			full_name=full_name,
 		)
 		return
+	if sms_gateway == "WhatsApp (Meta)":
+		send_whatsapp_otp_sms(
+			phone_number_id=settings.meta_whatsapp_phone_number_id,
+			access_token=settings.get_password("meta_access_token"),
+			graph_api_version=settings.meta_graph_api_version,
+			template_name=settings.meta_whatsapp_otp_template_name,
+			template_language=settings.meta_whatsapp_otp_template_language,
+			mobile_no=mobile_no,
+			otp=otp,
+		)
+		return
 
 	frappe.throw(_("Unsupported SMS gateway. Configure Flutter Utils Settings first."))
 
@@ -853,6 +864,146 @@ def send_ultramsg_sms(
 			message=f"Status: {response.status_code}\nResponse: {response.text}",
 		)
 		frappe.throw(_("Failed to send OTP message through UltraMsg. Please try again later."))
+
+
+def send_whatsapp_otp_sms(
+	phone_number_id: str | None,
+	access_token: str | None,
+	graph_api_version: str | None,
+	template_name: str | None,
+	template_language: str | None,
+	mobile_no: str,
+	otp: str,
+) -> None:
+	"""Send an OTP through Meta WhatsApp Cloud API using an approved template.
+
+	Business-initiated conversations must start from an approved template, so the
+	OTP is delivered as the single body text parameter of the configured template.
+	"""
+	if not phone_number_id or not access_token or not template_name:
+		frappe.throw(_("WhatsApp Cloud API is not fully configured in Flutter Utils Settings."))
+
+	payload = {
+		"messaging_product": "whatsapp",
+		"to": whatsapp_recipient(mobile_no),
+		"type": "template",
+		"template": {
+			"name": template_name,
+			"language": {"code": normalize_whatsapp_template_language(template_language)},
+			"components": [
+				{"type": "body", "parameters": [{"type": "text", "text": str(otp)}]},
+			],
+		},
+	}
+	post_whatsapp_message(
+		phone_number_id=phone_number_id,
+		access_token=access_token,
+		graph_api_version=graph_api_version,
+		payload=payload,
+		failure_title="WhatsApp OTP Message Failed",
+		failure_message=_("Failed to send OTP message through WhatsApp. Please try again later."),
+	)
+
+
+def send_whatsapp_plain_message(
+	phone_number_id: str | None,
+	access_token: str | None,
+	graph_api_version: str | None,
+	mobile_no: str,
+	message: str,
+) -> None:
+	"""Send a free-form text message through Meta WhatsApp Cloud API.
+
+	Free-form text is only delivered inside an open 24-hour customer service
+	window; use it for integration tests and follow-ups, not first-contact OTPs.
+	"""
+	if not phone_number_id or not access_token:
+		frappe.throw(_("WhatsApp Cloud API is not fully configured in Flutter Utils Settings."))
+
+	payload = {
+		"messaging_product": "whatsapp",
+		"to": whatsapp_recipient(mobile_no),
+		"type": "text",
+		"text": {"preview_url": False, "body": message},
+	}
+	post_whatsapp_message(
+		phone_number_id=phone_number_id,
+		access_token=access_token,
+		graph_api_version=graph_api_version,
+		payload=payload,
+		failure_title="WhatsApp Test Message Failed",
+		failure_message=_("Failed to send test message through WhatsApp."),
+	)
+
+
+def whatsapp_recipient(mobile_no: str) -> str:
+	"""WhatsApp Cloud API expects international digits without a leading '+'."""
+	return (mobile_no or "").strip().lstrip("+")
+
+
+def normalize_whatsapp_template_language(template_language: str | None) -> str:
+	trimmed = (template_language or "").strip()
+	return trimmed or "en_US"
+
+
+def normalize_graph_api_version(graph_api_version: str | None) -> str:
+	trimmed = (graph_api_version or "").strip()
+	return trimmed or "v23.0"
+
+
+def post_whatsapp_message(
+	phone_number_id: str,
+	access_token: str,
+	graph_api_version: str | None,
+	payload: dict[str, Any],
+	failure_title: str,
+	failure_message: str,
+) -> None:
+	version = normalize_graph_api_version(graph_api_version)
+	response = requests.post(
+		f"https://graph.facebook.com/{version}/{phone_number_id}/messages",
+		headers={
+			"Authorization": f"Bearer {access_token}",
+			"Content-Type": "application/json",
+		},
+		json=payload,
+		timeout=15,
+	)
+	if response.status_code >= 400:
+		frappe.log_error(
+			title=failure_title,
+			message=f"Status: {response.status_code}\nResponse: {response.text}",
+		)
+		frappe.throw(failure_message)
+
+
+def test_meta_connection() -> dict:
+	"""Verify the configured WhatsApp phone number ID and access token."""
+	settings = get_flutter_utils_settings()
+	phone_number_id = (settings.meta_whatsapp_phone_number_id or "").strip()
+	access_token = settings.get_password("meta_access_token")
+	if not phone_number_id or not access_token:
+		frappe.throw(_("WhatsApp Phone Number ID and Access Token are required."))
+
+	version = normalize_graph_api_version(settings.meta_graph_api_version)
+	response = requests.get(
+		f"https://graph.facebook.com/{version}/{phone_number_id}",
+		headers={"Authorization": f"Bearer {access_token}"},
+		timeout=15,
+	)
+	if response.status_code >= 400:
+		frappe.log_error(
+			title="Meta Connection Test Failed",
+			message=f"Status: {response.status_code}\nResponse: {response.text}",
+		)
+		frappe.throw(_("Meta connection test failed. Check the Phone Number ID and Access Token."))
+
+	try:
+		data = response.json()
+	except ValueError:
+		data = {}
+	display = data.get("display_phone_number") or data.get("verified_name") or phone_number_id
+	return {"message": _("Connected to WhatsApp number {0}.").format(display)}
 
 
 def get_flutter_utils_settings():
@@ -973,6 +1124,15 @@ def deliver_test_mobile_message(settings, mobile_no: str, message: str) -> None:
 			base_url=settings.ultramsg_base_url,
 			instance_id=settings.ultramsg_instance_id,
 			token=settings.get_password("ultramsg_token"),
+			mobile_no=mobile_no,
+			message=message,
+		)
+		return
+	if sms_gateway == "WhatsApp (Meta)":
+		send_whatsapp_plain_message(
+			phone_number_id=settings.meta_whatsapp_phone_number_id,
+			access_token=settings.get_password("meta_access_token"),
+			graph_api_version=settings.meta_graph_api_version,
 			mobile_no=mobile_no,
 			message=message,
 		)

@@ -460,3 +460,108 @@ class TestNativePasswordLogin(TestCase):
 		cache.assert_not_called()
 		self.assertNotIn("pwd", frappe.form_dict)
 		self.assertNotIn("otp", frappe.local.response)
+
+
+class TestWhatsAppOtpGateway(FrappeTestCase):
+	def _settings(self, **overrides) -> frappe._dict:
+		values = {
+			"enable_mobile_otp": 1,
+			"sms_gateway": "WhatsApp (Meta)",
+			"meta_whatsapp_phone_number_id": "1234567890",
+			"meta_whatsapp_otp_template_name": "otp_login",
+			"meta_whatsapp_otp_template_language": "en_US",
+			"meta_graph_api_version": "v23.0",
+		}
+		values.update(overrides)
+		return frappe._dict({"get_password": lambda field: "test-secret", **values})
+
+	def test_routes_mobile_otp_through_whatsapp_template(self) -> None:
+		settings = self._settings()
+		response = Mock(status_code=200, text="{}")
+		with (
+			patch("flutter_utils.api.auth.get_flutter_utils_settings", return_value=settings),
+			patch("flutter_utils.api.auth.requests.post", return_value=response) as post,
+		):
+			auth.send_otp_sms("+919400797246", "1234", "login", "Test User")
+
+		post.assert_called_once()
+		args, kwargs = post.call_args
+		self.assertEqual(args[0], "https://graph.facebook.com/v23.0/1234567890/messages")
+		self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-secret")
+		payload = kwargs["json"]
+		self.assertEqual(payload["to"], "919400797246")
+		self.assertEqual(payload["type"], "template")
+		self.assertEqual(payload["template"]["name"], "otp_login")
+		self.assertEqual(payload["template"]["language"]["code"], "en_US")
+		self.assertEqual(payload["template"]["components"][0]["parameters"][0]["text"], "1234")
+
+	def test_falls_back_to_default_template_language(self) -> None:
+		settings = self._settings(meta_whatsapp_otp_template_language=None)
+		response = Mock(status_code=200, text="{}")
+		with (
+			patch("flutter_utils.api.auth.get_flutter_utils_settings", return_value=settings),
+			patch("flutter_utils.api.auth.requests.post", return_value=response) as post,
+		):
+			auth.send_otp_sms("+919400797246", "1234", "login")
+
+		self.assertEqual(post.call_args.kwargs["json"]["template"]["language"]["code"], "en_US")
+
+	def test_plain_message_uses_text_payload(self) -> None:
+		settings = self._settings()
+		response = Mock(status_code=200, text="{}")
+		with patch("flutter_utils.api.auth.requests.post", return_value=response) as post:
+			auth.deliver_test_mobile_message(settings, "919400797246", "hello")
+
+		payload = post.call_args.kwargs["json"]
+		self.assertEqual(payload["type"], "text")
+		self.assertEqual(payload["text"]["body"], "hello")
+		self.assertEqual(payload["to"], "919400797246")
+
+	def test_raises_when_whatsapp_is_not_configured(self) -> None:
+		with self.assertRaises(frappe.ValidationError):
+			auth.send_whatsapp_otp_sms(
+				phone_number_id=None,
+				access_token=None,
+				graph_api_version=None,
+				template_name=None,
+				template_language=None,
+				mobile_no="+919400797246",
+				otp="1234",
+			)
+
+	def test_reports_provider_errors(self) -> None:
+		response = Mock(status_code=400, text="bad request")
+		with (
+			patch("flutter_utils.api.auth.frappe.log_error"),
+			patch("flutter_utils.api.auth.requests.post", return_value=response),
+			self.assertRaises(frappe.ValidationError),
+		):
+			auth.send_whatsapp_otp_sms(
+				phone_number_id="123",
+				access_token="token",
+				graph_api_version=None,
+				template_name="otp_login",
+				template_language=None,
+				mobile_no="+919400797246",
+				otp="1234",
+			)
+
+	def test_recipient_drops_leading_plus(self) -> None:
+		self.assertEqual(auth.whatsapp_recipient(" +919400797246 "), "919400797246")
+
+	def test_connection_test_reports_number(self) -> None:
+		settings = frappe._dict(
+			meta_whatsapp_phone_number_id="1234567890",
+			meta_graph_api_version="v23.0",
+			get_password=lambda field: "test-secret",
+		)
+		response = Mock(status_code=200)
+		response.json.return_value = {"display_phone_number": "+91 94007 97246"}
+		with (
+			patch("flutter_utils.api.auth.get_flutter_utils_settings", return_value=settings),
+			patch("flutter_utils.api.auth.requests.get", return_value=response) as get,
+		):
+			result = auth.test_meta_connection()
+
+		self.assertEqual(get.call_args.args[0], "https://graph.facebook.com/v23.0/1234567890")
+		self.assertIn("+91 94007 97246", result["message"])

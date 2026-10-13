@@ -207,12 +207,31 @@ Supported SMS gateways:
 
 - `Twilio`
 - `UltraMsg`
+- `WhatsApp (Meta)`
 
 UltraMsg delivery uses the official endpoint:
 
 - `POST /{instance_id}/messages/chat`
 - body params: `token`, `to`, `body`
 - default base URL: `https://api.ultramsg.com`
+
+### WhatsApp Cloud API (Meta)
+
+Mobile OTP can be delivered through Meta WhatsApp Cloud API. Enable `Enable Mobile OTP`,
+select `WhatsApp (Meta)` as the `SMS Gateway`, then open the `Meta` tab and configure:
+
+- `Phone Number ID`
+- `Access Token` (stored encrypted)
+- `OTP Template Name`
+- `OTP Template Language` (defaults to `en_US`)
+- `Graph API Version` (defaults to `v23.0`)
+
+`Test Meta Connection` verifies the phone number ID and access token against the
+Graph API. OTP delivery uses the approved template's single body text parameter,
+because business-initiated conversations must start from an approved template.
+`Send Test Message` uses a free-form text message, which Meta only delivers inside
+an open 24-hour customer service window. See
+[WhatsApp Cloud API](docs/whatsapp-cloud-api.md) for details.
 
 ## Integration Test
 

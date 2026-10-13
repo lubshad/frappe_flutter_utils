@@ -6,6 +6,13 @@ frappe.ui.form.on("Flutter Utils Settings", {
 			}
 		});
 	},
+	test_meta_connection(frm) {
+		frm.call("test_meta_connection").then((r) => {
+			if (r.message?.message) {
+				frappe.msgprint(r.message.message);
+			}
+		});
+	},
 	send_test_message(frm) {
 		const channel = frm.doc.enable_mobile_otp ? "mobile" : "email";
 		const fieldLabel = channel === "mobile" ? "recipient mobile number" : "recipient email";
