@@ -160,6 +160,9 @@ def _revoke_credential(credential_name: str, reason: str) -> None:
 		update_modified=False,
 	)
 	api_key = frappe.db.get_value(AUTHORIZATION_SOURCE, credential_name, "api_key")
+	# Integration cleanup must also run for this direct database revocation path.
+	for callback in frappe.get_hooks("device_credential_revoked"):
+		frappe.get_attr(callback)(credential_name)
 	disconnect_device_sockets(api_key)
 
 

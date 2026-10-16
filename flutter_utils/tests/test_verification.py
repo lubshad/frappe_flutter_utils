@@ -831,6 +831,22 @@ class TestVerification(TestCase):
 			self.assertNotIn("Identity", send.call_args.args[2])
 		self.assertEqual(self.db.get_doc(delivery.doctype, delivery.name).status, "Failed")
 
+	def test_push_content_is_decision_specific(self) -> None:
+		doc = frappe._dict(title="National ID", doctype="Verification Document", name="VD-1")
+
+		title, body = notifications.push_content(
+			doc, frappe._dict(action="Approved", name="EV-1", reason=None)
+		)
+		self.assertEqual(title, "National ID: approved")
+		self.assertIn("Approved", body)
+
+		title, body = notifications.push_content(
+			doc, frappe._dict(action="Rejected", name="EV-2", reason="The photo is blurred.")
+		)
+		self.assertEqual(title, "National ID: rejected")
+		self.assertIn("The photo is blurred.", body)
+		self.assertIn("Resubmit", body)
+
 	def test_email_is_separate_policy_controlled_delivery(self) -> None:
 		with patch.object(CustomSubjectPolicy, "email_enabled", True):
 			self.create(

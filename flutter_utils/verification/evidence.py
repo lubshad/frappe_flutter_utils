@@ -12,7 +12,11 @@ from frappe import _
 from frappe.utils import cint, now_datetime
 from frappe.utils.verified_command import get_signed_params
 
-from flutter_utils.verification.media import SUPPORTED_EXTENSIONS, validate_mp4
+from flutter_utils.verification.media import (
+	SUPPORTED_EXTENSIONS,
+	VIDEO_EXTENSIONS,
+	validate_mp4,
+)
 
 
 def get_max_file_size() -> int:
@@ -28,10 +32,22 @@ def check_content(filename: str, content: bytes, config: Any) -> None:
 		frappe.throw(_("Unsupported evidence file format."))
 	if not content or len(content) > min(cint(config.max_file_size_mb) * 1024 * 1024, get_max_file_size()):
 		frappe.throw(_("Evidence is empty or exceeds the upload limit."))
-	if extension == "mp4":
+	if extension in VIDEO_EXTENSIONS:
 		validate_mp4(content)
 		return
 	# Do not trust the filename or client MIME type. Only inert document/image formats.
+	if extension == "webp":
+		if not (len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"):
+			frappe.throw(_("Evidence content does not match its file format."))
+		return
+	if extension == "gif":
+		if not content.startswith((b"GIF87a", b"GIF89a")):
+			frappe.throw(_("Evidence content does not match its file format."))
+		return
+	if extension == "bmp":
+		if not content.startswith(b"BM"):
+			frappe.throw(_("Evidence content does not match its file format."))
+		return
 	signatures = {
 		"pdf": b"%PDF-",
 		"png": b"\x89PNG\r\n\x1a\n",

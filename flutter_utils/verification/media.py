@@ -5,7 +5,24 @@ from __future__ import annotations
 import frappe
 from frappe import _
 
-SUPPORTED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "mp4"}
+SUPPORTED_EXTENSIONS = {
+	"pdf",
+	"png",
+	"jpg",
+	"jpeg",
+	"webp",
+	"gif",
+	"bmp",
+	"mp4",
+	"m4v",
+	"mov",
+	"3gp",
+	"3g2",
+}
+
+#: Video containers validated with the bounded ISO-BMFF (QuickTime/MP4) parser.
+VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "3gp", "3g2"}
+
 VIDEO_CODECS = {b"avc1", b"avc3", b"hvc1", b"hev1", b"mp4v", b"vp09", b"av01"}
 MP4_BRANDS = {
 	b"isom",
@@ -18,7 +35,14 @@ MP4_BRANDS = {
 	b"mp42",
 	b"avc1",
 	b"M4V ",
+	b"m4v ",
 	b"dash",
+	# QuickTime (iOS recordings) and 3GPP containers share the same box layout.
+	b"qt  ",
+	b"3gp4",
+	b"3gp5",
+	b"3gp6",
+	b"3g2a",
 }
 
 
@@ -27,19 +51,19 @@ def _boxes(data: memoryview) -> list[tuple[bytes, memoryview]]:
 	offset = 0
 	while offset < len(data):
 		if len(data) - offset < 8 or len(result) >= 10000:
-			frappe.throw(_("Invalid MP4 container."))
+			frappe.throw(_("Invalid video container."))
 		size = int.from_bytes(data[offset : offset + 4], "big")
 		kind = bytes(data[offset + 4 : offset + 8])
 		header = 8
 		if size == 1:
 			if len(data) - offset < 16:
-				frappe.throw(_("Invalid MP4 container."))
+				frappe.throw(_("Invalid video container."))
 			size = int.from_bytes(data[offset + 8 : offset + 16], "big")
 			header = 16
 		elif size == 0:
 			size = len(data) - offset
 		if size < header or size > len(data) - offset:
-			frappe.throw(_("Invalid MP4 container."))
+			frappe.throw(_("Invalid video container."))
 		result.append((kind, data[offset + header : offset + size]))
 		offset += size
 	return result
@@ -53,11 +77,11 @@ def validate_mp4(content: bytes) -> None:
 	boxes = _boxes(memoryview(content))
 	brands = _children(boxes, b"ftyp")
 	if len(brands) != 1 or len(brands[0]) < 8 or (len(brands[0]) - 8) % 4:
-		frappe.throw(_("Evidence is not a supported MP4 video."))
+		frappe.throw(_("Evidence is not a supported video file."))
 	brand = brands[0]
 	declared = {bytes(brand[:4]), *(bytes(brand[index : index + 4]) for index in range(8, len(brand), 4))}
 	if not declared.intersection(MP4_BRANDS) or not any(len(data) for data in _children(boxes, b"mdat")):
-		frappe.throw(_("Evidence is not a supported MP4 video."))
+		frappe.throw(_("Evidence is not a supported video file."))
 	for movie in _children(boxes, b"moov"):
 		for track in _children(_boxes(movie), b"trak"):
 			for media in _children(_boxes(track), b"mdia"):
@@ -74,7 +98,7 @@ def validate_mp4(content: bytes) -> None:
 								continue
 							entries = _boxes(description[8:])
 							if int.from_bytes(description[4:8], "big") != len(entries):
-								frappe.throw(_("Invalid MP4 video track."))
+								frappe.throw(_("Invalid video track."))
 							for codec, entry in entries:
 								if (
 									codec in VIDEO_CODECS
@@ -83,4 +107,4 @@ def validate_mp4(content: bytes) -> None:
 									and int.from_bytes(entry[26:28], "big")
 								):
 									return
-	frappe.throw(_("MP4 evidence must contain a supported video track, not audio only."))
+	frappe.throw(_("Video evidence must contain a supported video track, not audio only."))

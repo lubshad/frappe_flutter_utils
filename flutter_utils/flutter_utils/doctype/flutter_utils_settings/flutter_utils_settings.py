@@ -32,11 +32,6 @@ class FlutterUtilsSettings(Document):
 		app_identifier: DF.Data | None
 		app_support_email: DF.Data | None
 		app_support_url: DF.Data | None
-		apns_team_id: DF.Data | None
-		apns_key_id: DF.Data | None
-		apns_private_key: DF.Password | None
-		apns_voip_bundle_id: DF.Data | None
-		apns_use_sandbox: DF.Check
 		email_otp_body_template: DF.TextEditor | None
 		email_otp_subject_template: DF.Data | None
 		enable_app_settings: DF.Check

@@ -138,6 +138,27 @@ def _enqueue_dispatch() -> None:
 		frappe.log_error(title="Verification outbox scheduling failed", message=type(exc).__name__)
 
 
+def push_content(doc: Any, event: Any) -> tuple[str, str]:
+	"""Short, decision-specific copy for the device notification."""
+	label = doc.title or (
+		"Verification request" if doc.doctype == "Verification Request" else "Verification document"
+	)
+	action = str(event.action or "").lower()
+	title = f"{label}: {action}"
+	if event.action == "Rejected":
+		reason = (event.reason or "").strip()
+		body = (
+			f"Rejected — {reason}. Resubmit corrected evidence."
+			if reason
+			else "Rejected. Resubmit corrected evidence."
+		)
+	elif event.action == "Approved":
+		body = "Approved. No further action needed."
+	else:
+		body = NEXT_STEPS.get(event.action, "Open the app to view your verification update.")
+	return title, body
+
+
 def dispatch_due() -> None:
 	"""Worker/scheduler entry point. Commit each independent delivery."""
 	if not frappe.db.exists("DocType", "Verification Notification Delivery"):
@@ -187,12 +208,20 @@ def deliver(name: str) -> None:
 			elif delivery.channel == "Push":
 				from flutter_utils.push_notifications import send_push_notifications
 
+				title, body = push_content(doc, event)
 				sent = send_push_notifications(
 					[delivery.recipient],
-					"Verification update",
-					"Open the app to view your verification update.",
+					title,
+					body,
 					app=delivery.push_app,
-					data={"event": event.name, "record": doc.name, "doctype": doc.doctype},
+					data={
+						"type": "verification",
+						"event": event.name,
+						"record": doc.name,
+						"doctype": doc.doctype,
+						"action": str(event.action or ""),
+						"route": delivery.link or "",
+					},
 					strict=True,
 				)
 				if not sent:

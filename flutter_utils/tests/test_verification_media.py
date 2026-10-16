@@ -14,7 +14,9 @@ def box(kind: bytes, payload: bytes) -> bytes:
 	return (len(payload) + 8).to_bytes(4, "big") + kind + payload
 
 
-def video_sample(handler: bytes = b"vide", codec: bytes = b"avc1") -> bytes:
+def video_sample(
+	handler: bytes = b"vide", codec: bytes = b"avc1", brand: bytes = b"isom\0\0\0\0mp42"
+) -> bytes:
 	entry = bytearray(78)
 	entry[24:26] = (16).to_bytes(2, "big")
 	entry[26:28] = (16).to_bytes(2, "big")
@@ -25,7 +27,7 @@ def video_sample(handler: bytes = b"vide", codec: bytes = b"avc1") -> bytes:
 			b"mdia", box(b"hdlr", b"\0" * 8 + handler + b"\0" * 12) + box(b"minf", box(b"stbl", description))
 		),
 	)
-	return box(b"ftyp", b"isom\0\0\0\0mp42") + box(b"moov", track) + box(b"mdat", b"sample")
+	return box(b"ftyp", brand) + box(b"moov", track) + box(b"mdat", b"sample")
 
 
 def throw(message: str, exc: type[Exception] = frappe.ValidationError, **kwargs: object) -> None:
@@ -69,6 +71,36 @@ class VerificationMediaTests(TestCase):
 			evidence.check_content(
 				"intro.mp4", video_sample(), frappe._dict(allowed_extensions="mp4", max_file_size_mb=10)
 			)
+
+	def test_webp_gif_and_bmp_are_signature_checked(self) -> None:
+		config = frappe._dict(allowed_extensions="webp\ngif\nbmp", max_file_size_mb=10)
+		valid = (
+			("img.webp", b"RIFF\x08\x00\x00\x00WEBPVP8 "),
+			("img.gif", b"GIF89a" + b"\0" * 4),
+			("img.bmp", b"BM" + b"\0" * 8),
+		)
+		for name, data in valid:
+			with self.subTest(name=name):
+				evidence.check_content(name, data, config)
+		invalid = (
+			("img.webp", b"RIFF\x08\x00\x00\x00NOPE"),
+			("img.gif", b"NOTGIF89a"),
+			("img.bmp", b"XX" + b"\0" * 8),
+		)
+		for name, data in invalid:
+			with self.subTest(name=name), self.assertRaises(frappe.ValidationError):
+				evidence.check_content(name, data, config)
+
+	def test_quicktime_and_3gpp_video_containers_are_supported(self) -> None:
+		config = frappe._dict(allowed_extensions="mp4\nm4v\nmov\n3gp\n3g2", max_file_size_mb=10)
+		for extension, brand in (
+			("mov", b"qt  \0\0\0\0"),
+			("m4v", b"m4v \0\0\0\0"),
+			("3gp", b"3gp4\0\0\0\0"),
+			("3g2", b"3g2a\0\0\0\0"),
+		):
+			with self.subTest(extension=extension):
+				evidence.check_content(f"clip.{extension}", video_sample(brand=brand), config)
 
 	def test_private_import_rejects_foreign_public_and_attached_files_before_open(self) -> None:
 		for values in ({"owner": "other"}, {"is_private": 0}, {"attached_to_name": "already-attached"}):

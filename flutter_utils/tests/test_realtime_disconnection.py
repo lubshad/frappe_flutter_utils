@@ -72,6 +72,7 @@ class TestRealtimeDisconnection(TestCase):
 				patch("frappe.db.get_value", return_value="key"),
 				patch("frappe.db.set_value") as set_value,
 				patch("flutter_utils.push_notifications.deactivate_device_push"),
+				patch("frappe.get_hooks", return_value=[]),
 				patch("flutter_utils.realtime.disconnect_device_sockets") as disconnect,
 			):
 				_revoke_credential("credential", reason)

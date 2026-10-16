@@ -54,12 +54,6 @@
   "firebase_project_id",
   "firebase_service_account_json",
   "test_firebase_connection",
-  "apns_section",
-  "apns_team_id",
-  "apns_key_id",
-  "apns_private_key",
-  "apns_voip_bundle_id",
-  "apns_use_sandbox",
   "email_and_sms_tab",
   "banner_settings_section",
   "default_banner_slideshow",
@@ -405,48 +399,6 @@
    "label": "Test Firebase Connection"
   },
   {
-   "depends_on": "eval:doc.enable_firebase_push",
-   "fieldname": "apns_section",
-   "fieldtype": "Section Break",
-   "label": "Apple VoIP Push (CallKit)"
-  },
-  {
-   "depends_on": "eval:doc.enable_firebase_push",
-   "description": "Apple Developer Team ID (10 characters), used to sign the APNs token.",
-   "fieldname": "apns_team_id",
-   "fieldtype": "Data",
-   "label": "APNs Team ID"
-  },
-  {
-   "depends_on": "eval:doc.enable_firebase_push",
-   "description": "Key ID of the APNs auth key (.p8).",
-   "fieldname": "apns_key_id",
-   "fieldtype": "Data",
-   "label": "APNs Key ID"
-  },
-  {
-   "depends_on": "eval:doc.enable_firebase_push",
-   "description": "Contents of the APNs auth key (.p8). Stored encrypted and never returned by public APIs.",
-   "fieldname": "apns_private_key",
-   "fieldtype": "Password",
-   "label": "APNs Private Key (.p8)"
-  },
-  {
-   "depends_on": "eval:doc.enable_firebase_push",
-   "description": "iOS bundle id; the VoIP topic is this value plus \".voip\". Falls back to the Application Identifier when empty.",
-   "fieldname": "apns_voip_bundle_id",
-   "fieldtype": "Data",
-   "label": "APNs VoIP Bundle ID"
-  },
-  {
-   "default": "0",
-   "depends_on": "eval:doc.enable_firebase_push",
-   "description": "Use the APNs sandbox (api.development.push.apple.com). Enable for debug builds.",
-   "fieldname": "apns_use_sandbox",
-   "fieldtype": "Check",
-   "label": "Use APNs Sandbox"
-  },
-  {
    "fieldname": "email_and_sms_tab",
    "fieldtype": "Tab Break",
    "label": "Email & SMS"
@@ -638,7 +590,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 13:52:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Flutter Utils",
  "name": "Flutter Utils Settings",
