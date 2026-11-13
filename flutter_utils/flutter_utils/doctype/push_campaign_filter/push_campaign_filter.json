@@ -1,0 +1,11 @@
+{
+ "doctype": "DocType", "name": "Push Campaign Filter", "module": "Flutter Utils", "istable": 1, "engine": "InnoDB",
+ "editable_grid": 1, "sort_field": "creation",
+ "creation": "2026-11-11 12:00:00.000000", "modified": "2026-11-11 12:00:00.000000",
+ "field_order": ["user_field", "operator", "value"],
+ "fields": [
+  {"fieldname": "user_field", "label": "User Field", "fieldtype": "Autocomplete", "reqd": 1, "in_list_view": 1, "columns": 4},
+  {"fieldname": "operator", "label": "Operator", "fieldtype": "Select", "options": "=\n!=\nin\nnot in\nis set\nis not set\n>\n>=\n<\n<=\ncontains", "default": "=", "reqd": 1, "in_list_view": 1, "columns": 3},
+  {"fieldname": "value", "label": "Value", "fieldtype": "Data", "in_list_view": 1, "columns": 3, "description": "Use comma-separated values for in / not in. Leave blank for is set / is not set. Dates use YYYY-MM-DD."}
+ ], "permissions": []
+}

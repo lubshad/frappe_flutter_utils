@@ -1,0 +1,20 @@
+{
+ "doctype": "DocType", "name": "Push Campaign Run", "module": "Flutter Utils", "autoname": "hash", "engine": "InnoDB",
+ "creation": "2026-11-11 12:00:00.000000", "modified": "2026-11-11 12:00:00.000000",
+ "sort_field": "creation", "sort_order": "DESC",
+ "field_order": ["campaign", "run_key", "scheduled_at", "status", "recipient_count", "device_count", "accepted", "failed", "skipped", "unknown", "last_error"],
+ "fields": [
+  {"fieldname": "campaign", "label": "Campaign", "fieldtype": "Link", "options": "Push Campaign", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "run_key", "label": "Run Key", "fieldtype": "Data", "unique": 1, "reqd": 1},
+  {"fieldname": "scheduled_at", "label": "Scheduled At", "fieldtype": "Datetime", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "status", "label": "Status", "fieldtype": "Select", "options": "Pending\nReady\nCompleted\nFailed\nCancelled", "default": "Pending", "in_list_view": 1},
+  {"fieldname": "recipient_count", "label": "Matched Users", "fieldtype": "Int"},
+  {"fieldname": "device_count", "label": "Eligible Devices", "fieldtype": "Int"},
+  {"fieldname": "accepted", "label": "FCM Accepted", "fieldtype": "Int", "description": "Provider acceptance is not proof of device delivery or opening."},
+  {"fieldname": "failed", "label": "Failed", "fieldtype": "Int"},
+  {"fieldname": "skipped", "label": "Skipped", "fieldtype": "Int"},
+  {"fieldname": "unknown", "label": "Unknown Outcome", "fieldtype": "Int"},
+  {"fieldname": "last_error", "label": "Last Error", "fieldtype": "Data"}
+ ],
+ "permissions": [{"role": "System Manager", "read": 1, "report": 1, "export": 1, "print": 1}]
+}

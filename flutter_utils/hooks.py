@@ -81,6 +81,7 @@ doctype_js = {
 scheduler_events = {
 	"daily": ["flutter_utils.verification.tasks.refresh_validity"],
 	"cron": {
+		"* * * * *": ["flutter_utils.campaigns.worker.enqueue_due"],
 		"*/5 * * * *": [
 			"flutter_utils.verification.notifications.dispatch_due",
 			"flutter_utils.firebase_certificates.refresh_firebase_certificates",

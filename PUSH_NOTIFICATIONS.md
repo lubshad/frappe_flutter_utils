@@ -4,6 +4,10 @@
 Applications retain their own recipient authorization, notification preferences,
 inbox records, and deep-link payloads.
 
+For Desk-managed push campaigns, User-field audiences, scheduled sends and recurring
+sends, see [Push campaigns](docs/PUSH_CAMPAIGNS.md). Campaigns add their own durable
+outbox/history; the basic backend sender described below remains best-effort.
+
 ## Setup
 
 1. Run `bench --site <site> migrate` after deploying the app.

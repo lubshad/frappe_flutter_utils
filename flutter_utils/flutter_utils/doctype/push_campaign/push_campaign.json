@@ -1,0 +1,26 @@
+{
+ "doctype": "DocType", "name": "Push Campaign", "module": "Flutter Utils", "autoname": "hash", "engine": "InnoDB", "track_changes": 1,
+ "creation": "2026-11-11 12:00:00.000000", "modified": "2026-11-11 12:00:00.000000",
+ "title_field": "campaign_name", "search_fields": "campaign_name,app,status", "sort_field": "modified", "sort_order": "DESC",
+ "field_order": ["campaign_name", "status", "content_section", "app", "push_title", "push_body", "audience_section", "match_mode", "audience_filters", "schedule_section", "send_mode", "timezone", "start_date", "send_time", "frequency", "end_date", "next_run_at"],
+ "fields": [
+  {"fieldname": "campaign_name", "label": "Campaign Name", "fieldtype": "Data", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "status", "label": "Status", "fieldtype": "Select", "options": "Draft\nActive\nPaused\nCompleted\nCancelled", "default": "Draft", "read_only": 1, "no_copy": 1, "in_list_view": 1},
+  {"fieldname": "content_section", "label": "Push Content", "fieldtype": "Section Break"},
+  {"fieldname": "app", "label": "App Identifier", "fieldtype": "Data", "reqd": 1, "in_list_view": 1, "description": "Exact app identifier used when registering devices."},
+  {"fieldname": "push_title", "label": "Push Title", "fieldtype": "Data", "reqd": 1},
+  {"fieldname": "push_body", "label": "Push Message", "fieldtype": "Small Text", "reqd": 1},
+  {"fieldname": "audience_section", "label": "User Audience", "fieldtype": "Section Break", "description": "No conditions means all enabled users except Guest and Administrator. Only enabled push devices for this app receive messages. Audience is refreshed for each run."},
+  {"fieldname": "match_mode", "label": "Match Conditions", "fieldtype": "Select", "options": "All\nAny", "default": "All", "reqd": 1},
+  {"fieldname": "audience_filters", "label": "User Conditions", "fieldtype": "Table", "options": "Push Campaign Filter"},
+  {"fieldname": "schedule_section", "label": "Schedule", "fieldtype": "Section Break"},
+  {"fieldname": "send_mode", "label": "Send Mode", "fieldtype": "Select", "options": "Now\nScheduled\nRecurring", "default": "Now", "reqd": 1},
+  {"fieldname": "timezone", "label": "Timezone", "fieldtype": "Data", "default": "UTC", "reqd": 1, "description": "IANA timezone, such as Asia/Kolkata. Start date and send time use this timezone."},
+  {"fieldname": "start_date", "label": "Start Date", "fieldtype": "Date", "depends_on": "eval:doc.send_mode != 'Now'", "mandatory_depends_on": "eval:doc.send_mode != 'Now'"},
+  {"fieldname": "send_time", "label": "Send Time", "fieldtype": "Time", "depends_on": "eval:doc.send_mode != 'Now'", "mandatory_depends_on": "eval:doc.send_mode != 'Now'"},
+  {"fieldname": "frequency", "label": "Repeat", "fieldtype": "Select", "options": "Daily\nWeekly\nMonthly", "default": "Daily", "depends_on": "eval:doc.send_mode == 'Recurring'"},
+  {"fieldname": "end_date", "label": "End Date (Inclusive)", "fieldtype": "Date", "depends_on": "eval:doc.send_mode == 'Recurring'"},
+  {"fieldname": "next_run_at", "label": "Next Run (Site Time)", "fieldtype": "Datetime", "read_only": 1, "no_copy": 1}
+ ],
+ "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "report": 1, "export": 1, "print": 1}]
+}
