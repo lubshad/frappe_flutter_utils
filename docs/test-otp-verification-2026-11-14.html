@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test OTP — video evidence — 14 Nov 2026</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 1080px; margin: auto; padding: 24px; line-height: 1.5; }
+    h1 { margin-bottom: 8px; }
+    .notice { border-left: 4px solid #b97900; padding: 12px 16px; background: light-dark(#fff8e8, #302714); }
+    .summary { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+    .summary span { border: 1px solid #8886; padding: 8px 14px; border-radius: 6px; }
+    section { margin: 24px 0; padding: 20px; border: 1px solid #8886; border-radius: 8px; }
+    h2 { margin: 0; font-size: 1.15rem; }
+    .pass { color: light-dark(#176b36, #80df9b); font-size: .9rem; }
+    video { display: block; width: 100%; max-height: 600px; margin: 16px 0 8px; background: #111; border-radius: 4px; }
+    a { color: light-dark(#1657bd, #97bfff); }
+    nav a { display: inline-block; margin: 4px 8px 4px 0; }
+    footer { padding: 24px 0; font-size: .9rem; }
+    @media (max-width: 600px) { body { padding: 14px; } section { padding: 14px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Test OTP: video evidence</h1>
+    <p><strong>sync-dating.localhost</strong> · 14 November 2026</p>
+    <div class="summary"><span>13 / 13 passed</span><span>12 Desk cases</span><span>1 Appium case</span><span>13 separate MP4 recordings</span></div>
+    <p>These are real recordings of a fresh successful rerun. The original run was not recorded. Each player below belongs to one test. All videos passed full decoding checks.</p>
+    <p class="notice"><strong>Internal test evidence.</strong> Recordings show test identities and visible OTPs. Do not publish them or reuse these credentials elsewhere.</p>
+    <p><a href="test-otp-verification-2026-11-14.md">Full Markdown report</a> · <a href="test-evidence/2026-11-14/manifest.json">Video manifest</a></p>
+    <nav aria-label="Test recordings"><a href="#D01">D01</a><a href="#D02">D02</a><a href="#D03">D03</a><a href="#D04">D04</a><a href="#D05">D05</a><a href="#D06">D06</a><a href="#D07">D07</a><a href="#D08">D08</a><a href="#D09">D09</a><a href="#D10">D10</a><a href="#D11">D11</a><a href="#D12">D12</a><a href="#C01">C01 · Appium</a></nav>
+  </header>
+  <main>
+    <section id="D01"><h2>D01 — Add a phone entry <span class="pass">PASS</span></h2><p>Add an enabled mobile override, save, reload, and verify its values.</p><video controls playsinline preload="none" aria-label="D01 add phone recording" src="test-evidence/2026-11-14/D01-add-phone.mp4"></video><a href="test-evidence/2026-11-14/D01-add-phone.mp4">Open MP4 · 40.3 seconds</a></section>
+    <section id="D02"><h2>D02 — Add an email entry <span class="pass">PASS</span></h2><p>Save an email entry alongside the phone and verify both remain.</p><video controls playsinline preload="none" aria-label="D02 add email recording" src="test-evidence/2026-11-14/D02-add-email.mp4"></video><a href="test-evidence/2026-11-14/D02-add-email.mp4">Open MP4 · 5.1 seconds</a></section>
+    <section id="D03"><h2>D03 — Multiple entries <span class="pass">PASS</span></h2><p>Add multiple rows with different codes and verify them after reload.</p><video controls playsinline preload="none" aria-label="D03 multiple entries recording" src="test-evidence/2026-11-14/D03-multiple-entries.mp4"></video><a href="test-evidence/2026-11-14/D03-multiple-entries.mp4">Open MP4 · 7.4 seconds</a></section>
+    <section id="D04"><h2>D04 — View the static OTP <span class="pass">PASS</span></h2><p>Open the saved row and confirm that its code is visible as plain text.</p><video controls playsinline preload="none" aria-label="D04 visible OTP recording" src="test-evidence/2026-11-14/D04-visible-otp.mp4"></video><a href="test-evidence/2026-11-14/D04-visible-otp.mp4">Open MP4 · 2.7 seconds</a></section>
+    <section id="D05"><h2>D05 — Leading zero <span class="pass">PASS</span></h2><p>Save a code beginning with zero and verify it in the reopened row.</p><video controls playsinline preload="none" aria-label="D05 leading zero recording" src="test-evidence/2026-11-14/D05-leading-zero.mp4"></video><a href="test-evidence/2026-11-14/D05-leading-zero.mp4">Open MP4 · 7.1 seconds</a></section>
+    <section id="D06"><h2>D06 — Edit an entry <span class="pass">PASS</span></h2><p>Change the recipient and code; verify the other rows remain unchanged.</p><video controls playsinline preload="none" aria-label="D06 edit entry recording" src="test-evidence/2026-11-14/D06-edit-entry.mp4"></video><a href="test-evidence/2026-11-14/D06-edit-entry.mp4">Open MP4 · 4.8 seconds</a></section>
+    <section id="D07"><h2>D07 — Disable an entry <span class="pass">PASS</span></h2><p>Clear Enabled, save, reload, and verify the saved unchecked state.</p><video controls playsinline preload="none" aria-label="D07 disable entry recording" src="test-evidence/2026-11-14/D07-disable-entry.mp4"></video><a href="test-evidence/2026-11-14/D07-disable-entry.mp4">Open MP4 · 5.8 seconds</a></section>
+    <section id="D08"><h2>D08 — Re-enable an entry <span class="pass">PASS</span></h2><p>Use keyboard Space to enable the checkbox, save, reload, and verify. A prior pointer attempt was blocked by a Desk tooltip; this clip is the successful rerun.</p><video controls playsinline preload="none" aria-label="D08 re-enable entry recording" src="test-evidence/2026-11-14/D08-reenable-entry.mp4"></video><a href="test-evidence/2026-11-14/D08-reenable-entry.mp4">Open MP4 · 5.1 seconds</a></section>
+    <section id="D09"><h2>D09 — Remove one entry <span class="pass">PASS</span></h2><p>Delete one selected row and verify that only that row is removed.</p><video controls playsinline preload="none" aria-label="D09 remove one recording" src="test-evidence/2026-11-14/D09-remove-one.mp4"></video><a href="test-evidence/2026-11-14/D09-remove-one.mp4">Open MP4 · 4.3 seconds</a></section>
+    <section id="D10"><h2>D10 — Remove multiple entries <span class="pass">PASS</span></h2><p>Delete two selected rows while retaining the unselected phone entry.</p><video controls playsinline preload="none" aria-label="D10 remove multiple recording" src="test-evidence/2026-11-14/D10-remove-multiple.mp4"></video><a href="test-evidence/2026-11-14/D10-remove-multiple.mp4">Open MP4 · 4.7 seconds</a></section>
+    <section id="D11"><h2>D11 — Normalize recipients <span class="pass">PASS</span></h2><p>Save a formatted phone and mixed-case email; verify E.164 and lowercase values.</p><video controls playsinline preload="none" aria-label="D11 normalization recording" src="test-evidence/2026-11-14/D11-normalize-recipients.mp4"></video><a href="test-evidence/2026-11-14/D11-normalize-recipients.mp4">Open MP4 · 8.3 seconds</a></section>
+    <section id="D12"><h2>D12 — Disabled delivery channels <span class="pass">PASS</span></h2><p>Save enabled test entries while both Email OTP and Mobile OTP are disabled.</p><video controls playsinline preload="none" aria-label="D12 disabled channels recording" src="test-evidence/2026-11-14/D12-disabled-channels.mp4"></video><a href="test-evidence/2026-11-14/D12-disabled-channels.mp4">Open MP4 · 4.8 seconds</a></section>
+    <section id="C01"><h2>C01 — Appium mobile login <span class="pass">PASS</span></h2><p>Native Android recording: enter the requested phone, request a code, enter the static OTP, reach the member home, and open Me. Global Test Mode and Mobile OTP were off. Subsequent protected reads returned HTTP 200 for the correct user.</p><video controls playsinline preload="none" aria-label="C01 Appium login recording" src="test-evidence/2026-11-14/C01-appium-login.mp4"></video><a href="test-evidence/2026-11-14/C01-appium-login.mp4">Open MP4 · 16.3 seconds</a></section>
+  </main>
+  <footer>Original settings restored; temporary rows removed; the new test credential revoked; existing device credentials preserved. The phone field needed a screen-derived touch fallback because its native accessibility node was merged. Android emulator only; no iOS run.</footer>
+</body>
+</html>

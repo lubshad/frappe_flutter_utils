@@ -79,11 +79,16 @@ class FlutterUtilsSettings(Document):
 
 		self._validate_app_settings()
 
-		if not self.enable_email_otp and not self.enable_mobile_otp and not self.enable_firebase_auth:
+		if (
+			not self.enable_email_otp
+			and not self.enable_mobile_otp
+			and not self.enable_firebase_auth
+			and not any(row.enabled for row in self.get("test_otp_accounts") or [])
+		):
 			frappe.throw(_("Enable at least one authentication provider."))
 
 		self._validate_firebase_settings()
-		self._validate_test_phone_login()
+		self._validate_test_otp_accounts()
 
 		if not self.enable_mobile_otp or self.test_mode:
 			return
@@ -113,24 +118,28 @@ class FlutterUtilsSettings(Document):
 			if not value:
 				frappe.throw(_("{0} is required when Mobile OTP is enabled.").format(label))
 
-	def _validate_test_phone_login(self) -> None:
-		if not self.get("enable_test_phone_login"):
-			return
-		if not self.enable_mobile_otp:
-			frappe.throw(_("Enable Mobile OTP before enabling Test Phone Login."))
-		from flutter_utils.api.auth import (
-			_validate_test_phone_user,
-			get_enabled_user_by_mobile,
-			normalize_mobile_number,
-		)
+	def _validate_test_otp_accounts(self) -> None:
+		from flutter_utils.api.auth import normalize_email, normalize_mobile_number
 
-		if not self.get("test_phone_number") or not self.test_phone_number.strip().startswith("+"):
-			frappe.throw(_("Test Phone Number must include the international country code."))
-		self.test_phone_number = normalize_mobile_number(self.test_phone_number)
-		code = self.get_password("test_phone_otp", raise_exception=False) or ""
-		if not code.isascii() or not code.isdigit() or len(code) != int(self.otp_length or 4):
-			frappe.throw(_("Static OTP must contain exactly the configured OTP Length in digits."))
-		_validate_test_phone_user(get_enabled_user_by_mobile(self.test_phone_number))
+		seen: set[tuple[str, str]] = set()
+		for row in self.get("test_otp_accounts") or []:
+			if row.channel not in {"mobile", "email"}:
+				frappe.throw(_("Test OTP channel must be mobile or email."))
+			if row.channel == "mobile":
+				if not (row.recipient or "").strip().startswith("+"):
+					frappe.throw(_("Test phone numbers must include the international country code."))
+				row.recipient = normalize_mobile_number(row.recipient)
+			else:
+				row.recipient = normalize_email(row.recipient)
+				if not row.recipient or not frappe.utils.validate_email_address(row.recipient):
+					frappe.throw(_("Enter a valid test email address."))
+			key = (row.channel, row.recipient)
+			if key in seen:
+				frappe.throw(_("Duplicate test OTP recipient."))
+			seen.add(key)
+			code = row.static_otp or ""
+			if not code.isascii() or not code.isdigit() or len(code) != int(self.otp_length or 4):
+				frappe.throw(_("Static OTP must contain exactly the configured OTP Length in digits."))
 
 	def on_update(self) -> None:
 		previous = self.get_doc_before_save()

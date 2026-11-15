@@ -1,0 +1,22 @@
+{
+ "doctype": "DocType",
+ "name": "Test OTP Account",
+ "module": "Flutter Utils",
+ "creation": "2026-11-14 12:00:00.000000",
+ "modified": "2026-11-14 12:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "istable": 1,
+ "editable_grid": 1,
+ "field_order": ["enabled", "channel", "recipient", "static_otp"],
+ "fields": [
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1", "in_list_view": 1, "columns": 1},
+  {"fieldname": "channel", "fieldtype": "Select", "label": "Channel", "options": "mobile\nemail", "reqd": 1, "in_list_view": 1, "columns": 2},
+  {"fieldname": "recipient", "fieldtype": "Data", "label": "Phone / Email", "reqd": 1, "in_list_view": 1, "columns": 4, "description": "Exact email address or international phone number including + and country code."},
+  {"fieldname": "static_otp", "fieldtype": "Data", "label": "Static OTP", "reqd": 1, "in_list_view": 1, "columns": 3, "description": "Visible plain text credential. Must match OTP Length. Use dedicated test identities only."}
+ ],
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

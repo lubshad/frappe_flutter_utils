@@ -14,7 +14,7 @@ deployments of the realtime handler require restarting Socket.IO as well as Pyth
 - **SendGrid HTTP Email**: Send standard Frappe Email Queue messages through SendGrid without SMTP or the deprecated `frappe_sendgrid` app. See [setup and migration](docs/SENDGRID.md).
 - **Native Password + 2FA Authentication**: Frappe-managed email/password login with Email, SMS, or OTP App verification, returning browser sessions or managed device credentials.
 - **Mobile OTP Authentication**: Passwordless login and signup via 6-digit OTP sent to mobile using Twilio.
-- **Test Phone Login**: Optional static OTP for one dedicated demo account, without sending a real message or enabling global Test Mode. See [setup and security](docs/test-phone-login.md).
+- **Test OTP Overrides**: Multiple phone/email recipients with visible static OTPs for all supported OTP flows, without sending messages or enabling global Test Mode. Overrides work even when their channel is disabled. Use dedicated test identities; codes are stored in plain text. See [setup and security](docs/test-phone-login.md).
 - **Firebase Authentication**: Firebase ID-token verification with Frappe session, API credential, and per-request authentication modes.
 - **Multi-device Authentication**: Issues independently revocable API credentials per client installation and enforces a configurable per-user device limit.
 
@@ -200,7 +200,7 @@ After `bench migrate`, open `Flutter Utils Settings` from Desk and configure:
 
 Mobile numbers are validated and normalized to E.164 format before lookup, OTP delivery, and user creation. If the client sends a number without a `+` prefix, the app uses the selected `Default Region` country and falls back to `System Settings > Country`.
 
-When `Test Mode` is enabled, OTP send APIs do not send email or SMS. They return the generated OTP directly in the JSON response as `otp`, along with `test_mode: 1`.
+When `Test Mode` is enabled, OTP send APIs do not send email or SMS. For ordinary recipients they return the generated OTP directly in the JSON response as `otp`, along with `test_mode: 1`. Enabled **Test OTP Accounts** take precedence: their configured static codes are never returned, even in Test Mode.
 
 Templates are also settings-based now. Supported placeholders:
 

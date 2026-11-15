@@ -1,0 +1,80 @@
+[
+  {
+    "file": "C01-appium-login.mp4",
+    "seconds": 16.29,
+    "bytes": 3526076,
+    "decode_passed": true
+  },
+  {
+    "file": "D01-add-phone.mp4",
+    "seconds": 40.27,
+    "bytes": 980394,
+    "decode_passed": true
+  },
+  {
+    "file": "D02-add-email.mp4",
+    "seconds": 5.13,
+    "bytes": 667851,
+    "decode_passed": true
+  },
+  {
+    "file": "D03-multiple-entries.mp4",
+    "seconds": 7.4,
+    "bytes": 879427,
+    "decode_passed": true
+  },
+  {
+    "file": "D04-visible-otp.mp4",
+    "seconds": 2.73,
+    "bytes": 353815,
+    "decode_passed": true
+  },
+  {
+    "file": "D05-leading-zero.mp4",
+    "seconds": 7.07,
+    "bytes": 1241497,
+    "decode_passed": true
+  },
+  {
+    "file": "D06-edit-entry.mp4",
+    "seconds": 4.8,
+    "bytes": 877175,
+    "decode_passed": true
+  },
+  {
+    "file": "D07-disable-entry.mp4",
+    "seconds": 5.8,
+    "bytes": 1016043,
+    "decode_passed": true
+  },
+  {
+    "file": "D08-reenable-entry.mp4",
+    "seconds": 5.13,
+    "bytes": 795609,
+    "decode_passed": true
+  },
+  {
+    "file": "D09-remove-one.mp4",
+    "seconds": 4.33,
+    "bytes": 446600,
+    "decode_passed": true
+  },
+  {
+    "file": "D10-remove-multiple.mp4",
+    "seconds": 4.73,
+    "bytes": 590539,
+    "decode_passed": true
+  },
+  {
+    "file": "D11-normalize-recipients.mp4",
+    "seconds": 8.27,
+    "bytes": 894647,
+    "decode_passed": true
+  },
+  {
+    "file": "D12-disabled-channels.mp4",
+    "seconds": 4.8,
+    "bytes": 989429,
+    "decode_passed": true
+  }
+]

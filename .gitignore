@@ -2,3 +2,7 @@
 __pycache__/
 *.py[cod]
 .ruff_cache/
+
+# Keep test recordings and recorder sidecars local.
+docs/test-evidence/**/*.mp4
+docs/test-evidence/**/*.mp4.json

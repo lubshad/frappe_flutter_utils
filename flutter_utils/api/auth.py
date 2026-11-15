@@ -155,6 +155,8 @@ def send_otp(
 	if purpose == "verify_mobile" and frappe.session.user == "Guest":
 		frappe.throw(_("Sign in before verifying a mobile number."), frappe.AuthenticationError)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
+	test_entry = _get_test_otp_entry(settings, context)
+	require_otp_channel_available(settings, context, test_entry)
 	if purpose == "verify_mobile" and context["channel"] != "mobile":
 		frappe.throw(_("Mobile verification requires a mobile number."))
 
@@ -165,10 +167,6 @@ def send_otp(
 	if purpose == "login":
 		user = validate_login_target(context)
 		payload = {"otp": otp}
-		test_otp = _get_test_phone_otp(settings, purpose, context, user)
-		if test_otp:
-			payload["otp"] = test_otp
-			payload["test_phone_login"] = _test_phone_challenge_identity(settings, user)
 		recipient_name = user.full_name
 	elif purpose == "reset_password":
 		user = validate_reset_password_target(context)
@@ -182,6 +180,17 @@ def send_otp(
 		payload["otp"] = otp
 		recipient_name = payload["full_name"]
 
+	if test_entry:
+		payload["otp"] = test_entry.static_otp
+		account = ""
+		if purpose in {"login", "reset_password"}:
+			account = user.name
+		elif purpose == "verify_mobile":
+			account = frappe.session.user
+		payload["test_otp_override"] = _test_otp_challenge_identity(
+			settings, test_entry, purpose, context, account
+		)
+
 	cache_key = build_otp_cache_key(purpose, context["channel"], context["recipient"])
 	otp_set(
 		cache_key,
@@ -189,7 +198,7 @@ def send_otp(
 		ttl=get_otp_ttl_seconds(),
 	)
 
-	if payload.get("test_phone_login"):
+	if payload.get("test_otp_override"):
 		record_otp_resend_cooldown(purpose, context["channel"], context["recipient"])
 		return build_otp_send_response()
 
@@ -240,24 +249,38 @@ def verify_otp(
 		hash_device_id(device_id)
 		normalize_device_name(device_name)
 	context = resolve_otp_context(channel=channel, email=email, mobile_no=mobile_no)
+	settings = get_flutter_utils_settings()
+	test_entry = _get_test_otp_entry(settings, context)
+	require_otp_channel_available(settings, context, test_entry)
 	cache_key = build_otp_cache_key(purpose, context["channel"], context["recipient"])
 	raw = otp_get(cache_key)
 	data = json.loads(raw) if raw else None
 
 	if not data or data.get("otp") != otp.strip():
 		frappe.throw(_("Invalid or expired OTP."))
-
 	if data.get("test_phone_login"):
-		settings = get_flutter_utils_settings()
-		user = validate_login_target(context)
-		configured_otp = _get_test_phone_otp(settings, purpose, context, user)
+		otp_delete(cache_key)
+		frappe.throw(_("Invalid or expired OTP."))
+
+	if data.get("test_otp_override"):
+		account = ""
+		if purpose == "login":
+			account = validate_login_target(context).name
+		elif purpose == "reset_password":
+			account = validate_reset_password_target(context).name
+		elif purpose == "verify_mobile":
+			account = frappe.session.user
 		if (
-			not configured_otp
-			or configured_otp != otp.strip()
-			or data["test_phone_login"] != _test_phone_challenge_identity(settings, user)
+			not test_entry
+			or test_entry.static_otp != otp.strip()
+			or data["test_otp_override"]
+			!= _test_otp_challenge_identity(settings, test_entry, purpose, context, account)
 		):
 			otp_delete(cache_key)
 			frappe.throw(_("Invalid or expired OTP."))
+	elif not settings.get("test_mode") and not settings.get(f"enable_{context['channel']}_otp"):
+		otp_delete(cache_key)
+		frappe.throw(_("Invalid or expired OTP."))
 
 	otp_delete(cache_key)
 
@@ -457,42 +480,54 @@ def resolve_otp_context(
 	return {"channel": "mobile", "recipient": normalized_mobile}
 
 
-def _get_test_phone_otp(settings: Any, purpose: str, context: dict[str, str], user: Any) -> str | None:
-	"""Only an explicitly configured, unprivileged mobile login may skip delivery."""
+def require_otp_channel_available(settings: Any, context: dict[str, str], test_entry: Any = None) -> None:
+	"""Only explicitly listed recipients may bypass disabled delivery channels."""
 	if (
-		not settings.get("enable_test_phone_login")
-		or not settings.get("enable_mobile_otp")
-		or purpose != "login"
-		or context["channel"] != "mobile"
-		or context["recipient"] != settings.get("test_phone_number")
+		not test_entry
+		and not settings.get("test_mode")
+		and not settings.get(f"enable_{context['channel']}_otp")
 	):
-		return None
-	_validate_test_phone_user(user)
-	code = settings.get_password("test_phone_otp", raise_exception=False) or ""
-	if not code.isascii() or not code.isdigit() or len(code) != int(settings.otp_length or 4):
-		frappe.throw(_("Test phone login is not configured correctly."))
-	return code
+		frappe.throw(_("OTP is unavailable for this channel. Please use another sign-in method."))
 
 
-def _validate_test_phone_user(user: Any) -> None:
-	if (
-		not user.enabled
-		or user.name in {"Administrator", "Guest"}
-		or user.user_type != "Website User"
-		or set(frappe.get_roles(user.name)).intersection({"System Manager", "Super Admin"})
-	):
-		frappe.throw(_("Test phone login requires an enabled, non-admin Website User."))
+def require_mobile_otp_available(settings: Any, purpose: str, context: dict[str, str]) -> bool:
+	"""Compatibility gate for apps that check mobile availability before provisioning.
+
+	The caller must still issue and verify a shared OTP challenge. This gate alone
+	does not authorize an action or replace delivery in custom OTP implementations.
+	"""
+	if context["channel"] != "mobile":
+		return False
+	entry = _get_test_otp_entry(settings, context)
+	require_otp_channel_available(settings, context, entry)
+	return bool(entry and not settings.get("enable_mobile_otp") and not settings.get("test_mode"))
 
 
-def _test_phone_challenge_identity(settings: Any, user: Any) -> str:
-	"""Bind challenges to this saved configuration and account, not just the code."""
+def _get_test_otp_entry(settings: Any, context: dict[str, str]) -> Any:
+	for entry in settings.get("test_otp_accounts") or []:
+		if entry.enabled and entry.channel == context["channel"] and entry.recipient == context["recipient"]:
+			code = entry.static_otp or ""
+			if not code.isascii() or not code.isdigit() or len(code) != int(settings.otp_length or 4):
+				frappe.throw(_("OTP is unavailable. Please contact support."))
+			return entry
+	return None
+
+
+def _test_otp_challenge_identity(
+	settings: Any, entry: Any, purpose: str, context: dict[str, str], account: str
+) -> str:
+	"""Bind test challenges to the saved configuration, flow, and target account."""
 	return hashlib.sha256(
 		json.dumps(
 			[
 				str(settings.modified),
-				settings.test_phone_number,
-				user.name,
-				settings.get_password("test_phone_otp", raise_exception=False),
+				entry.name,
+				entry.channel,
+				entry.recipient,
+				entry.static_otp,
+				purpose,
+				context,
+				account,
 			]
 		).encode()
 	).hexdigest()

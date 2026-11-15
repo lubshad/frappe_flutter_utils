@@ -44,6 +44,7 @@
   "otp_default_region",
   "test_mode",
   "test_phone_section",
+  "test_otp_accounts",
   "enable_test_phone_login",
   "test_phone_number",
   "test_phone_otp",
@@ -316,7 +317,7 @@
   },
   {
    "default": "1",
-   "description": "Skip SMS delivery and return OTP values directly from send APIs.",
+   "description": "Skip email/SMS delivery and return generated OTPs for ordinary recipients. Configured test override codes are never returned.",
    "fieldname": "test_mode",
    "fieldtype": "Check",
    "label": "Test Mode"
@@ -324,29 +325,36 @@
   {
    "fieldname": "test_phone_section",
    "fieldtype": "Section Break",
-   "label": "Test Phone Login",
-   "description": "Use a dedicated demo Website User, never a personal or administrator account. Only mobile login skips delivery; other authentication flows are unchanged. Keep global Test Mode disabled in production."
+   "label": "Test OTP Overrides",
+   "description": "Listed recipients use visible static codes for every supported OTP flow, even when their channel is disabled. Registration, password reset, and verification have real effects. Use dedicated test identities only. Codes are stored in plain text and can appear in backups and exports. Keep global Test Mode disabled in production."
+  },
+  {
+   "fieldname": "test_otp_accounts",
+   "fieldtype": "Table",
+   "label": "Test OTP Accounts",
+   "options": "Test OTP Account"
   },
   {
    "fieldname": "enable_test_phone_login",
+   "hidden": 1,
    "fieldtype": "Check",
    "label": "Enable Test Phone Login",
    "default": "0"
   },
   {
    "fieldname": "test_phone_number",
+   "hidden": 1,
    "fieldtype": "Data",
    "label": "Test Phone Number",
    "depends_on": "eval:doc.enable_test_phone_login",
-   "mandatory_depends_on": "eval:doc.enable_test_phone_login",
    "description": "International format including country code, for example +15551234567. Must belong to an existing enabled, non-admin Website User."
   },
   {
    "fieldname": "test_phone_otp",
+   "hidden": 1,
    "fieldtype": "Password",
    "label": "Static OTP",
    "depends_on": "eval:doc.enable_test_phone_login",
-   "mandatory_depends_on": "eval:doc.enable_test_phone_login",
    "description": "Must match OTP Length. Never delivered or returned by the OTP API. Users must request a new challenge for each login."
   },
   {
@@ -559,7 +567,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 13:52:00.000000",
+ "modified": "2026-11-14 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Flutter Utils",
  "name": "Flutter Utils Settings",

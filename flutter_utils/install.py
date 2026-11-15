@@ -3,6 +3,7 @@ from frappe import _
 
 from flutter_utils.patches.v1_0.add_sendgrid_email_service import execute as add_sendgrid_email_service
 from flutter_utils.patches.v1_0.merge_push_registration import execute as merge_push_registration
+from flutter_utils.patches.v1_0.migrate_test_otp_accounts import execute as migrate_test_otp_accounts
 from flutter_utils.patches.v1_0.remove_user_workspace_sidebar_fields import (
 	execute as remove_user_workspace_sidebar_fields,
 )
@@ -13,6 +14,7 @@ def after_install():
 	create_default_otp_template()
 	remove_user_workspace_sidebar_fields()
 	merge_push_registration()
+	migrate_test_otp_accounts()
 	from flutter_utils.verification.setup import seed_defaults
 
 	seed_defaults()
