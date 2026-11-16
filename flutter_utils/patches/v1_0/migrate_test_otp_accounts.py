@@ -1,6 +1,7 @@
 """Preserve the legacy test phone configuration when moving to multi-channel overrides."""
 
 import frappe
+from frappe import _
 from frappe.utils.password import remove_encrypted_password
 
 
@@ -13,8 +14,23 @@ def execute() -> None:
 	if phone and code:
 		from flutter_utils.api.auth import normalize_mobile_number
 
-		phone = normalize_mobile_number(phone)
-		if not any(row.channel == "mobile" and row.recipient == phone for row in settings.test_otp_accounts):
+		try:
+			phone = normalize_mobile_number(phone)
+		except frappe.ValidationError:
+			if settings.get("enable_test_phone_login"):
+				frappe.throw(
+					_(
+						"Cannot migrate enabled Test Phone Login: invalid phone number. "
+						"Correct the legacy test phone number in Flutter Utils Settings and retry migration."
+					)
+				)
+			frappe.logger("flutter_utils").warning(
+				"Skipping invalid legacy test phone configuration because Test Phone Login is disabled."
+			)
+			phone = None
+		if phone and not any(
+			row.channel == "mobile" and row.recipient == phone for row in settings.test_otp_accounts
+		):
 			row = settings.append(
 				"test_otp_accounts",
 				{

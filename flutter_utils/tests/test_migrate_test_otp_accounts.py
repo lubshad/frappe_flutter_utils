@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 import frappe
 
+from flutter_utils.api.auth import normalize_mobile_number
 from flutter_utils.patches.v1_0 import migrate_test_otp_accounts as migration
 
 
@@ -28,9 +29,10 @@ class TestMigrateTestOTPAccounts(TestCase):
 		self.stack.enter_context(patch.object(migration.frappe, "clear_document_cache"))
 		self.stack.enter_context(patch.object(migration.frappe, "throw", side_effect=frappe.ValidationError))
 		self.remove_password = self.stack.enter_context(patch.object(migration, "remove_encrypted_password"))
-		self.stack.enter_context(
+		self.normalizer = self.stack.enter_context(
 			patch("flutter_utils.api.auth.normalize_mobile_number", return_value="+12025550123")
 		)
+		self.logger = self.stack.enter_context(patch.object(migration.frappe, "logger"))
 
 	def _append(self, field: str, values: dict) -> Mock:
 		self.settings[field].append(frappe._dict(values))
@@ -73,4 +75,37 @@ class TestMigrateTestOTPAccounts(TestCase):
 		self.settings.get_password.return_value = None
 		with self.assertRaises(frappe.ValidationError):
 			migration.execute()
+		self.remove_password.assert_not_called()
+
+	def test_invalid_disabled_legacy_phone_does_not_block_migration(self) -> None:
+		self.settings.enable_test_phone_login = 0
+		self.settings.test_phone_number = "not-a-phone"
+		self.normalizer.side_effect = normalize_mobile_number
+		with patch("flutter_utils.api.auth.get_flutter_utils_settings", return_value=self.settings):
+			with patch("flutter_utils.api.auth.get_default_phone_region", return_value="IN"):
+				migration.execute()
+		self.settings.append.assert_not_called()
+		self.logger.return_value.warning.assert_called_once()
+		self.remove_password.assert_called_once()
+		migration.frappe.db.set_single_value.assert_any_call(
+			"Flutter Utils Settings", "test_phone_number", ""
+		)
+
+	def test_invalid_enabled_legacy_phone_is_not_silently_lost(self) -> None:
+		self.settings.test_phone_number = "not-a-phone"
+		self.normalizer.side_effect = normalize_mobile_number
+		with patch("flutter_utils.api.auth.get_flutter_utils_settings", return_value=self.settings):
+			with patch("flutter_utils.api.auth.get_default_phone_region", return_value="IN"):
+				with self.assertRaises(frappe.ValidationError):
+					migration.execute()
+		self.settings.append.assert_not_called()
+		migration.frappe.db.set_single_value.assert_not_called()
+		self.remove_password.assert_not_called()
+
+	def test_unexpected_normalization_failure_is_not_ignored(self) -> None:
+		self.settings.enable_test_phone_login = 0
+		self.normalizer.side_effect = RuntimeError("Unexpected failure")
+		with self.assertRaises(RuntimeError):
+			migration.execute()
+		migration.frappe.db.set_single_value.assert_not_called()
 		self.remove_password.assert_not_called()
