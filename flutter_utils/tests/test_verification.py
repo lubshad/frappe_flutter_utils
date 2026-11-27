@@ -615,6 +615,26 @@ class TestVerification(TestCase):
 		frappe.enqueue.assert_called_once()
 		self.assertEqual(len(self.db.get_all("Verification Review Log")), 1)
 
+	def test_policy_can_skip_self_alerts_but_keep_realtime(self) -> None:
+		with patch.object(CustomSubjectPolicy, "notify_actor", False):
+			self.create(
+				source_app="custom",
+				reference_doctype="Test Organization",
+				reference_name="org-1",
+				verification_purpose="Registration",
+			)
+		self.assertEqual(self.db.get_all("Verification Notification Delivery"), [])
+		self.assertEqual(len(self.db.get_all("Verification Review Log")), 1)
+		frappe.publish_realtime.assert_called()
+
+	def test_reviewer_push_copy_does_not_claim_the_submission(self) -> None:
+		doc = self.create()
+		event = self.db.get_all("Verification Review Log")[0]
+		title, body = notifications._push_copy(doc, event, reviewer=True)
+		self.assertTrue(title)
+		self.assertIn("waiting for review", body)
+		self.assertNotIn("Your submission", body)
+
 	def test_in_app_delivery_retries_do_not_duplicate_notification(self) -> None:
 		self.create()
 		delivery = self.db.get_all("Verification Notification Delivery")[0]

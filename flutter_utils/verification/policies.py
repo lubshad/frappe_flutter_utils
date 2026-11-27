@@ -13,6 +13,9 @@ class VerificationPolicy:
 	purposes: tuple[str, ...] = ()
 	push_app: str | None = None
 	email_enabled = False
+	# Keep in-app/push alerts for the user who performed the action. Policies
+	# disable this when a client already confirms the action locally.
+	notify_actor = True
 
 	def validate_subject(self, doc: Any) -> None:
 		if (
