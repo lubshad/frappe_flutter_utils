@@ -33,6 +33,9 @@ class TestMcpConsent(unittest.TestCase):
 				response_type="Code",
 			)
 		).insert()
+		frontend = frappe.get_doc(
+			{"doctype": "MCP Frontend", "origin": origin, "clients": [{"oauth_client": client.name}]}
+		).insert()
 		try:
 			verifier = secrets.token_urlsafe(40)
 			challenge = (
@@ -52,7 +55,6 @@ class TestMcpConsent(unittest.TestCase):
 				).get_environ()
 			)
 			with (
-				patch.dict(frappe.conf, flutter_mcp_frontends={origin: [client.name]}),
 				patch.object(frappe.local, "request", request, create=True),
 			):
 				self.assertEqual(consent.resource_metadata().json["resource"], origin + "/api/v2/mcp")
@@ -98,6 +100,7 @@ class TestMcpConsent(unittest.TestCase):
 				self.assertEqual(response.status_code, 200)
 				self.assertIn("tools", response.json["result"])
 		finally:
+			frontend.delete()
 			for dt in ("OAuth Bearer Token", "OAuth Authorization Code"):
 				frappe.db.delete(dt, {"client": client.name})
 			frappe.delete_doc("OAuth Client", client.name, ignore_permissions=True)

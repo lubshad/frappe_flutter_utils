@@ -10,6 +10,9 @@ from flutter_utils.patches.v1_0.remove_user_workspace_sidebar_fields import (
 
 
 def after_install():
+	from flutter_utils.patches.v1_0.import_mcp_frontends import execute as import_mcp_frontends
+
+	import_mcp_frontends()
 	add_sendgrid_email_service()
 	create_default_otp_template()
 	remove_user_workspace_sidebar_fields()

@@ -1,0 +1,5 @@
+{
+ "doctype":"DocType","name":"MCP Frontend Client","module":"Flutter Utils","engine":"InnoDB","istable":1,"editable_grid":1,"sort_field":"creation","permissions":[],
+ "creation":"2026-11-27 10:00:00.000000","modified":"2026-11-27 10:00:00.000000",
+ "field_order":["oauth_client"],"fields":[{"fieldname":"oauth_client","fieldtype":"Link","options":"OAuth Client","label":"OAuth Client","reqd":1,"in_list_view":1}]
+}

@@ -13,10 +13,16 @@ from werkzeug.wrappers import Response
 
 
 def _config(origin):
-	clients = (frappe.conf.get("flutter_mcp_frontends") or {}).get(origin)
-	if not isinstance(clients, list):
+	frontend = origin and frappe.db.get_value(
+		"MCP Frontend", {"origin": origin, "enabled": 1}, ["name", "origin"], as_dict=True
+	)
+	if not frontend or frontend.origin != origin:
 		frappe.throw("Frontend not configured", frappe.PermissionError)
-	return clients
+	return frappe.get_all(
+		"MCP Frontend Client",
+		filters={"parenttype": "MCP Frontend", "parentfield": "clients", "parent": frontend.name},
+		pluck="oauth_client",
+	)
 
 
 def _origin():

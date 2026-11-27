@@ -1,0 +1,9 @@
+{
+ "doctype": "DocType", "name": "MCP Frontend", "module": "Flutter Utils", "engine": "InnoDB", "autoname": "hash", "title_field": "origin", "show_title_field_in_link": 1,
+ "creation": "2026-11-27 10:00:00.000000", "modified": "2026-11-27 10:00:00.000000",
+ "field_order": ["origin", "enabled", "clients"], "fields": [
+  {"fieldname":"origin","fieldtype":"Data","label":"Frontend Origin","unique":1,"reqd":1,"in_list_view":1,"description":"Exact HTTPS origin without a trailing slash. HTTP is supported for localhost development."},
+  {"fieldname":"enabled","fieldtype":"Check","label":"Enabled","default":"1","in_list_view":1},
+  {"fieldname":"clients","fieldtype":"Table","label":"Allowed OAuth Clients","options":"MCP Frontend Client","description":"An empty list enables discovery only. Register clients in OAuth Client first."}
+ ], "permissions": [{"role":"System Manager","read":1,"write":1,"create":1,"delete":1}], "track_changes":1
+}
