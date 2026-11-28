@@ -635,6 +635,20 @@ class TestVerification(TestCase):
 		self.assertIn("waiting for review", body)
 		self.assertNotIn("Your submission", body)
 
+	def test_correction_notice_preserves_current_evidence_and_uses_recipient_copy(self) -> None:
+		doc = self.create()
+		original_files = [row.file for row in evidence.current_evidence(doc)]
+		self.assertTrue(original_files)
+		updated = service.notify_change(doc.doctype, doc.name, "Correction Requested")
+		self.assertEqual(updated.document_revision, doc.document_revision + 1)
+		self.assertEqual(updated.approval_status, doc.approval_status)
+		self.assertEqual([row.file for row in evidence.current_evidence(updated)], original_files)
+		event = self.db.get_all("Verification Review Log", filters={"action": "Correction Requested"})[0]
+		_, reviewer_body = notifications._push_copy(updated, event, reviewer=True)
+		_, submitter_body = notifications._push_copy(updated, event)
+		self.assertIn("after resubmission", reviewer_body)
+		self.assertIn("and resubmit", submitter_body)
+
 	def test_in_app_delivery_retries_do_not_duplicate_notification(self) -> None:
 		self.create()
 		delivery = self.db.get_all("Verification Notification Delivery")[0]

@@ -78,7 +78,7 @@ def _push_copy(doc: Any, event: Any, reviewer: bool = False) -> tuple[str, str]:
 	}:
 		body = "New or updated verification evidence is waiting for review."
 	elif reviewer and event.action == "Correction Requested":
-		body = NEXT_STEPS["Correction Requested"]
+		body = "The submitter has been asked to make corrections. Review the evidence after resubmission."
 	else:
 		body = NEXT_STEPS.get(event.action, "Open the app to view your verification update.")
 	if event.reason:

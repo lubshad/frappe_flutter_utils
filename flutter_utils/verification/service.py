@@ -354,14 +354,16 @@ def notify_change(
 ) -> Any:
 	"""Persist one user-facing notice without changing the approval state.
 
-	The revision advances so a repeated notice deduplicates against the previous
-	one and reviewers holding a revision token must refresh.
+	Each notice advances the revision so reviewers holding an older token
+	must refresh. The current evidence carries forward unchanged.
 	"""
 	_doctype(doctype)
 	with atomic():
 		doc = lock_record(doctype, record_id)
 		_active(doc)
 		doc.document_revision += 1
+		if doctype == "Verification Document":
+			_copy_evidence_revision(doc, doc.document_revision - 1)
 		_persist(doc)
 		_emit(doc, action, doc.approval_status, reason)
 		return doc
