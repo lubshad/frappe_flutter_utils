@@ -346,6 +346,27 @@ def transition(
 		return doc
 
 
+def notify_change(
+	doctype: str,
+	record_id: str,
+	action: str,
+	reason: str | None = None,
+) -> Any:
+	"""Persist one user-facing notice without changing the approval state.
+
+	The revision advances so a repeated notice deduplicates against the previous
+	one and reviewers holding a revision token must refresh.
+	"""
+	_doctype(doctype)
+	with atomic():
+		doc = lock_record(doctype, record_id)
+		_active(doc)
+		doc.document_revision += 1
+		_persist(doc)
+		_emit(doc, action, doc.approval_status, reason)
+		return doc
+
+
 def _copy_evidence_revision(doc: Any, previous_revision: int) -> None:
 	for row in list(doc.files):
 		if cint(row.revision) == previous_revision:

@@ -22,6 +22,7 @@ NEXT_STEPS = {
 	"Withdrawn": "This submission is no longer awaiting review.",
 	"Archived": "This submission has been archived; its review history is retained.",
 	"Reviewer Assigned": "The assigned reviewer should review the submission.",
+	"Correction Requested": "Please update the requested information or evidence and resubmit.",
 	"Expiring Soon": "Please provide renewed evidence before the expiry date.",
 	"Expired": "Please upload replacement evidence.",
 	"Evidence Invalidated": "Required evidence is no longer valid; another review is needed.",
@@ -58,16 +59,28 @@ def message_for(doc: Any, action: str, reason: str | None, reviewer: bool = Fals
 	return subject, " ".join(parts)
 
 
-def _push_copy(doc: Any, event: Any) -> tuple[str, str]:
+def _push_copy(doc: Any, event: Any, reviewer: bool = False) -> tuple[str, str]:
 	"""Action-first push copy that never leaks the document title.
 
 	Push content is visible on the lock screen, so it names the action and the
 	next step instead of the evidence title. The full detail stays in the
-	Notification Log and the in-app list.
+	Notification Log and the in-app list. Reviewer copy never says "your
+	submission", because the reviewer did not submit it.
 	"""
 	label = "Verification request" if doc.doctype == "Verification Request" else "Verification document"
 	title = f"{label} {str(event.action).lower()}"
-	body = NEXT_STEPS.get(event.action, "Open the app to view your verification update.")
+	if reviewer and event.action in {
+		"Submitted",
+		"Updated",
+		"Resubmitted",
+		"Reset",
+		"Evidence Invalidated",
+	}:
+		body = "New or updated verification evidence is waiting for review."
+	elif reviewer and event.action == "Correction Requested":
+		body = NEXT_STEPS["Correction Requested"]
+	else:
+		body = NEXT_STEPS.get(event.action, "Open the app to view your verification update.")
 	if event.reason:
 		body = f"{body} Reason: {event.reason}"
 	return title[:120], body[:300]
@@ -86,6 +99,11 @@ def record_event(doc: Any, action: str, before: str | None, reason: str | None =
 		else []
 	)
 	recipients = [user for user in enabled if can_access(doc, "read", user, policy)]
+	# The actor still receives realtime refreshes, but a policy can stop the
+	# self-alert: clients already confirm the action they just performed.
+	delivery_recipients = (
+		set(recipients) if getattr(policy, "notify_actor", True) else set(recipients) - {frappe.session.user}
+	)
 	with internal_write():
 		event = frappe.get_doc(
 			{
@@ -106,31 +124,34 @@ def record_event(doc: Any, action: str, before: str | None, reason: str | None =
 				"review_notes": doc.review_notes
 				if action in {"Approved", "Rejected", "Revoked", "Reset"}
 				else None,
-				"notification_state": "Resolved" if recipients else "No eligible recipients",
+				"notification_state": "Resolved" if delivery_recipients else "No eligible recipients",
 				"deduplication_key": key,
 			}
 		).insert(ignore_permissions=True)
 		for user in recipients:
-			subject, message = message_for(doc, action, reason, reviewer=policy.can(doc, "review", user))
-			optional = set(policy.channels(doc, action, user)) - {"In App"}
-			if optional - {"Push", "Email"} or ("Push" in optional and not policy.push_app):
-				frappe.throw("Invalid verification notification channel configuration.")
-			channels = ["In App", *sorted(optional)]
-			for channel in channels:
-				frappe.get_doc(
-					{
-						"doctype": "Verification Notification Delivery",
-						"event": event.name,
-						"recipient": user,
-						"channel": channel,
-						"delivery_key": hashlib.sha256(f"{event.name}:{user}:{channel}".encode()).hexdigest(),
-						"status": "Pending",
-						"subject": subject,
-						"message": message,
-						"link": client_link(policy.link(doc, user)),
-						"push_app": policy.push_app,
-					}
-				).insert(ignore_permissions=True)
+			if user in delivery_recipients:
+				subject, message = message_for(doc, action, reason, reviewer=policy.can(doc, "review", user))
+				optional = set(policy.channels(doc, action, user)) - {"In App"}
+				if optional - {"Push", "Email"} or ("Push" in optional and not policy.push_app):
+					frappe.throw("Invalid verification notification channel configuration.")
+				channels = ["In App", *sorted(optional)]
+				for channel in channels:
+					frappe.get_doc(
+						{
+							"doctype": "Verification Notification Delivery",
+							"event": event.name,
+							"recipient": user,
+							"channel": channel,
+							"delivery_key": hashlib.sha256(
+								f"{event.name}:{user}:{channel}".encode()
+							).hexdigest(),
+							"status": "Pending",
+							"subject": subject,
+							"message": message,
+							"link": client_link(policy.link(doc, user)),
+							"push_app": policy.push_app,
+						}
+					).insert(ignore_permissions=True)
 			frappe.publish_realtime(
 				"verification_update",
 				{
@@ -202,7 +223,9 @@ def deliver(name: str) -> None:
 			elif delivery.channel == "Push":
 				from flutter_utils.push_notifications import send_push_notifications
 
-				push_title, push_body = _push_copy(doc, event)
+				push_title, push_body = _push_copy(
+					doc, event, reviewer=policy.can(doc, "review", delivery.recipient)
+				)
 				sent = send_push_notifications(
 					[delivery.recipient],
 					push_title,
